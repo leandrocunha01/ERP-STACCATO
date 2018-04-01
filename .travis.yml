@@ -28,15 +28,15 @@ install:
   qt510serialport qt510speech qt510svg qt510tools qt510translations 
   qt510webchannel qt510websockets qt510x11extras qt510xmlpatterns qt510charts-no-lgpl"
   
-#  addons:
-#  coverity_scan:
-#    project:
-#      name: darktorres/ERP-STACCATO
-#      description: ERP-STACCATO
-#    notification_email: torres.dark@gmail.com
-#    build_command_prepend: source /opt/qt510/bin/qt510-env.sh && /opt/qt510/bin/qmake Loja.pro
-#    build_command: make -j3
-#    branch_pattern: coverity_scan
+  addons:
+  coverity_scan:
+    project:
+      name: "darktorres/ERP-STACCATO"
+      description: "ERP-STACCATO"
+    notification_email: torres.dark@gmail.com
+    build_command_prepend: "source /opt/qt510/bin/qt510-env.sh && /opt/qt510/bin/qmake Loja.pro"
+    build_command: "make -j3"
+    branch_pattern: coverity_scan
   
 #script:
 #  - source /opt/qt510/bin/qt510-env.sh
