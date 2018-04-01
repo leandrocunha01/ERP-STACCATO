@@ -5,28 +5,28 @@ dist: trusty
 
 env:
   global:
-   # The next declaration is the encrypted COVERITY_SCAN_TOKEN, created
-   #   via the "travis encrypt" command using the project repo's public key
+   # COVERITY_SCAN_TOKEN
+   # ** specific to your project **
    - secure: "jYkcbxwDehdwra8vHPtSE5Y7xtGwyksiHRIYkxEbIuUT8hMMEz6B06yyz9clYu4y+JIqQ/CXDp2AV741BR9wcOoCRO2GQAa6ghPlK6oldYMoo42GZEb/z03gJ9F8xayx8DWbtRKWB9TCq83R5KScZtLYVRrp7Z+Qy0E05K3X+eVaBMM99N1Mv6T882PycUJ2GxAilLKTiZ0RSXtrnRty6RY/7lSyRLQCX2q6HCEivhVFygTfFEO+PZZrrbq/S1Irb2xym0p1TxapnEH3nDVbXLkkjYpu7Dqm7oa/HtflPlhlSh14fpWeGEJCQjeXoLuISFJ1OpUGD+Halq7eMdNNc6HN7+IiakIp/IuXOme2TYk+wKVXtFupnQRpR+0jX19L9y2gYPDAW1/FdDfZ7Zp4hzivS5pSiXYAFcBi4d/UJgH5s48UGemslgOsWtT61hGzadDjm0ZvjUD8IZNlNiRIYsnh6RzLlOH+8GVczFzQ2UTC0EBOM2Hsei8kyhALK5FB2giCcLrQYGE1FBhqRqAwek1W+nOFurY2d6PXcL/HtRHok0T/sj2DJ00zWDTSNSwCv7aAEWd4BCAqZpcTL9jXHhnSR/hqe0ieDBwlxksbDrMU+Yw0QEiuQAAizAxlpLR0wo1gnt0UohCfeDOM3dGnnm9YHA/rSxaMeiAMet4cRvU="
 
-before_install:
-  - sudo add-apt-repository ppa:beineri/opt-qt-5.10.1-trusty -y
-  - sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
-  - sudo apt-get update
+#before_install:
+#  - sudo add-apt-repository ppa:beineri/opt-qt-5.10.1-trusty -y
+#  - sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
+#  - sudo apt-get update
 
-install:
-  - sudo apt-get install g++-7 gcc-7
-  - sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-7 90
-  - sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-7 90
-  - "sudo apt-get install dh-make freetds-common libbluetooth3 libegl1-mesa-drivers libmng2 libmtdev1
-  libopenal-data libopenal1 libopenvg1-mesa libopus0 libsdl2-2.0-0 libsnappy1
-  libsybdb5 libwayland-egl1-mesa libwebp5 libwebpdemux1 libxcb-icccm4
-  libxcb-image0 libxcb-keysyms1 libxcb-render-util0 libxcb-xinerama0 qt510base
-  qt510connectivity qt510gamepad qt510graphicaleffects qt510imageformats 
-  qt510location qt510multimedia qt510quickcontrols qt510quickcontrols2 
-  qt510remoteobjects qt510script qt510scxml qt510sensors qt510serialbus 
-  qt510serialport qt510speech qt510svg qt510tools qt510translations 
-  qt510webchannel qt510websockets qt510x11extras qt510xmlpatterns qt510charts-no-lgpl"
+#install:
+#  - sudo apt-get install g++-7 gcc-7
+#  - sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-7 90
+#  - sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-7 90
+#  - "sudo apt-get install dh-make freetds-common libbluetooth3 libegl1-mesa-drivers libmng2 libmtdev1
+#  libopenal-data libopenal1 libopenvg1-mesa libopus0 libsdl2-2.0-0 libsnappy1
+#  libsybdb5 libwayland-egl1-mesa libwebp5 libwebpdemux1 libxcb-icccm4
+#  libxcb-image0 libxcb-keysyms1 libxcb-render-util0 libxcb-xinerama0 qt510base
+#  qt510connectivity qt510gamepad qt510graphicaleffects qt510imageformats 
+#  qt510location qt510multimedia qt510quickcontrols qt510quickcontrols2 
+#  qt510remoteobjects qt510script qt510scxml qt510sensors qt510serialbus 
+#  qt510serialport qt510speech qt510svg qt510tools qt510translations 
+#  qt510webchannel qt510websockets qt510x11extras qt510xmlpatterns qt510charts-no-lgpl"
   
 addons:
   coverity_scan:
