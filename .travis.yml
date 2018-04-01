@@ -2,7 +2,13 @@ language: cpp
 compiler: gcc
 sudo: required
 dist: trusty
-    
+
+env:
+  global:
+   # The next declaration is the encrypted COVERITY_SCAN_TOKEN, created
+   #   via the "travis encrypt" command using the project repo's public key
+   - secure: "jqp6R5psEbvTGMA0aVr7qqAc0l8PdgH9qzImHlKvtsBZQc3ARrio3Z6sNLUSbzbZBZkthnWj8y1UiPvD2MNspic+YmbnD/htMlOBLgpK3MRW6K/8ZrFhVaBNgCp46tadlGuc3+g2a/gGUs3WzTDOOTzjCNZXFrzfH1o4ovNSwLibeTqWdpoFWXrXcuRBOu+h8F/vD9nwq6NslhjmRUME1I5yZvfw2P9AB+1Vsn3zgNN24QVQOB5vkIiQYi42jKYLd6A4newq5ot9ucJyyH8jNIRo6QJ6laA2W5gRhplFcs9WsL2TdUGUSHhPOhg9nnP2CGhTtqXfprZ9JvEbvislGmaN30XKnYUTJhnAy7XAt+ceC6xKApHMn1hWr9wzCIjhlp0MwSrQfd6Xw6bLjSHaJ3amEB5gyh4UFb7EP4JxWzR7PV3JEjJD/Iwlpe+c3M4/B7oL2DBhsSXOSIdBOEy5ZY4z3U6i/lXU1dqvTGzPNydhMLSopTVTajTiZQi8Z4Vv3v3yOUKejAQNmKVH1EnLme+drk6I+AS8E9kxr00v21pFL2NaUVLL4ys5G6lWcy/IfDWTF9gyFDL5pZjOmBmrnbypfM6330Lqb/0B34t3GiakxfHZJ7hdBUyA/DxfdvrwL1GnBQJp0eAE7tpCw1s8huteQ7ypzjBw43CvU1br6RU="
+
 before_install:
   - sudo add-apt-repository ppa:beineri/opt-qt-5.10.1-trusty -y
   - sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
@@ -22,10 +28,20 @@ install:
   qt510serialport qt510speech qt510svg qt510tools qt510translations 
   qt510webchannel qt510websockets qt510x11extras qt510xmlpatterns qt510charts-no-lgpl"
   
-script:
-  - source /opt/qt510/bin/qt510-env.sh
-  - /opt/qt510/bin/qmake Loja.pro
-  - make -j3
+  addons:
+  coverity_scan:
+    project:
+      name: darktorres/ERP-STACCATO
+      description: ERP-STACCATO
+    notification_email: torres.dark@gmail.com
+    build_command_prepend: source /opt/qt510/bin/qt510-env.sh && /opt/qt510/bin/qmake Loja.pro
+    build_command: make -j3
+    branch_pattern: coverity_scan
+  
+#script:
+#  - source /opt/qt510/bin/qt510-env.sh
+#  - /opt/qt510/bin/qmake Loja.pro
+#  - make -j3
   
   # TODO:
   # cache ccache cache folder?
