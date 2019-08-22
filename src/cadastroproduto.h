@@ -1,5 +1,4 @@
-#ifndef CADASTROPRODUTO_H
-#define CADASTROPRODUTO_H
+#pragma once
 
 #include "registerdialog.h"
 #include "searchdialog.h"
@@ -35,7 +34,4 @@ private:
   auto successMessage() -> void final;
   auto updateMode() -> void final;
   auto verifyFields() -> bool final;
-  auto viewRegister() -> bool final;
 };
-
-#endif // CADASTROPRODUTO_H

@@ -1,19 +1,19 @@
-#ifndef WIDGETCOMPRA_H
-#define WIDGETCOMPRA_H
+#pragma once
 
-#include "widget.h"
+#include <QWidget>
 
 namespace Ui {
 class WidgetCompra;
 }
 
-class WidgetCompra final : public Widget {
+class WidgetCompra final : public QWidget {
   Q_OBJECT
 
 public:
   explicit WidgetCompra(QWidget *parent = nullptr);
   ~WidgetCompra();
-  auto updateTables() -> bool;
+  auto resetTables() -> void;
+  auto updateTables() -> void;
 
 private:
   // attributes
@@ -22,5 +22,3 @@ private:
   auto on_tabWidget_currentChanged(const int &) -> void;
   auto setConnections() -> void;
 };
-
-#endif // WIDGETCOMPRA_H

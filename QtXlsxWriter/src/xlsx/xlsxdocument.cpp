@@ -99,12 +99,12 @@ bool DocumentPrivate::loadPackage(QIODevice *device) {
   QStringList filePaths = zipReader.filePaths();
 
   // Load the Content_Types file
-  if (not filePaths.contains(QLatin1String("[Content_Types].xml"))) return false;
+  if (not filePaths.contains(QLatin1String("[Content_Types].xml"))) { return false; }
   contentTypes = QSharedPointer<ContentTypes>(new ContentTypes(ContentTypes::F_LoadFromExists));
   contentTypes->loadFromXmlData(zipReader.fileData(QStringLiteral("[Content_Types].xml")));
 
   // Load root rels file
-  if (not filePaths.contains(QLatin1String("_rels/.rels"))) return false;
+  if (not filePaths.contains(QLatin1String("_rels/.rels"))) { return false; }
   Relationships rootRels;
   rootRels.loadFromXmlData(zipReader.fileData(QStringLiteral("_rels/.rels")));
 
@@ -136,7 +136,7 @@ bool DocumentPrivate::loadPackage(QIODevice *device) {
   // In normal case, this should be "xl/workbook.xml"
   workbook = QSharedPointer<Workbook>(new Workbook(Workbook::F_LoadFromExists));
   QList<XlsxRelationship> rels_xl = rootRels.documentRelationships(QStringLiteral("/officeDocument"));
-  if (rels_xl.isEmpty()) return false;
+  if (rels_xl.isEmpty()) { return false; }
   QString xlworkbook_Path = rels_xl[0].target;
   QString xlworkbook_Dir = splitPath(xlworkbook_Path)[0];
   workbook->relationships()->loadFromXmlData(zipReader.fileData(getRelFilePath(xlworkbook_Path)));
@@ -200,9 +200,7 @@ bool DocumentPrivate::loadPackage(QIODevice *device) {
 
   // load charts
   QList<QSharedPointer<Chart>> chartFileToLoad = workbook->chartFiles();
-  for (auto cf : chartFileToLoad) {
-    cf->loadFromXmlData(zipReader.fileData(cf->filePath()));
-  }
+  for (auto cf : chartFileToLoad) { cf->loadFromXmlData(zipReader.fileData(cf->filePath())); }
 
   // load media files
   QList<QSharedPointer<MediaFile>> mediaFileToLoad = workbook->mediaFiles();
@@ -219,9 +217,7 @@ bool DocumentPrivate::savePackage(QIODevice *device) const {
   Q_Q(const Document);
   ZipWriter zipWriter(device);
 
-  if (zipWriter.error()) {
-    return false;
-  }
+  if (zipWriter.error()) { return false; }
 
   contentTypes->clearOverrides();
 
@@ -231,9 +227,7 @@ bool DocumentPrivate::savePackage(QIODevice *device) const {
   // save worksheet xml files
   auto worksheets = workbook->getSheetsByTypes(AbstractSheet::ST_WorkSheet);
 
-  if (not worksheets.isEmpty()) {
-    docPropsApp.addHeadingPair(QStringLiteral("Worksheets"), worksheets.size());
-  }
+  if (not worksheets.isEmpty()) { docPropsApp.addHeadingPair(QStringLiteral("Worksheets"), worksheets.size()); }
 
   for (int i = 0; i < worksheets.size(); ++i) {
     auto sheet = worksheets[i];
@@ -243,17 +237,13 @@ bool DocumentPrivate::savePackage(QIODevice *device) const {
     zipWriter.addFile(QStringLiteral("xl/worksheets/sheet%1.xml").arg(i + 1), sheet->saveToXmlData());
     Relationships *rel = sheet->relationships();
 
-    if (not rel->isEmpty()) {
-      zipWriter.addFile(QStringLiteral("xl/worksheets/_rels/sheet%1.xml.rels").arg(i + 1), rel->saveToXmlData());
-    }
+    if (not rel->isEmpty()) { zipWriter.addFile(QStringLiteral("xl/worksheets/_rels/sheet%1.xml.rels").arg(i + 1), rel->saveToXmlData()); }
   }
 
   // save chartsheet xml files
   auto chartsheets = workbook->getSheetsByTypes(AbstractSheet::ST_ChartSheet);
 
-  if (not chartsheets.isEmpty()) {
-    docPropsApp.addHeadingPair(QStringLiteral("Chartsheets"), chartsheets.size());
-  }
+  if (not chartsheets.isEmpty()) { docPropsApp.addHeadingPair(QStringLiteral("Chartsheets"), chartsheets.size()); }
 
   for (int i = 0; i < chartsheets.size(); ++i) {
     auto sheet = chartsheets[i];
@@ -263,9 +253,7 @@ bool DocumentPrivate::savePackage(QIODevice *device) const {
     zipWriter.addFile(QStringLiteral("xl/chartsheets/sheet%1.xml").arg(i + 1), sheet->saveToXmlData());
     Relationships *rel = sheet->relationships();
 
-    if (not rel->isEmpty()) {
-      zipWriter.addFile(QStringLiteral("xl/chartsheets/_rels/sheet%1.xml.rels").arg(i + 1), rel->saveToXmlData());
-    }
+    if (not rel->isEmpty()) { zipWriter.addFile(QStringLiteral("xl/chartsheets/_rels/sheet%1.xml.rels").arg(i + 1), rel->saveToXmlData()); }
   }
 
   // save external links xml files
@@ -289,8 +277,7 @@ bool DocumentPrivate::savePackage(QIODevice *device) const {
 
     Drawing *drawing = workbook->drawings()[i];
     zipWriter.addFile(QStringLiteral("xl/drawings/drawing%1.xml").arg(i + 1), drawing->saveToXmlData());
-    if (not drawing->relationships()->isEmpty())
-      zipWriter.addFile(QStringLiteral("xl/drawings/_rels/drawing%1.xml.rels").arg(i + 1), drawing->relationships()->saveToXmlData());
+    if (not drawing->relationships()->isEmpty()) zipWriter.addFile(QStringLiteral("xl/drawings/_rels/drawing%1.xml.rels").arg(i + 1), drawing->relationships()->saveToXmlData());
   }
 
   // save docProps app/core xml file
@@ -813,7 +800,7 @@ bool Document::insertSheet(int index, const QString &name, AbstractSheet::SheetT
  */
 bool Document::renameSheet(const QString &oldName, const QString &newName) {
   Q_D(Document);
-  if (oldName == newName) return false;
+  if (oldName == newName) { return false; }
   return d->workbook->renameSheet(sheetNames().indexOf(oldName), newName);
 }
 
@@ -823,7 +810,7 @@ bool Document::renameSheet(const QString &oldName, const QString &newName) {
  */
 bool Document::copySheet(const QString &srcName, const QString &distName) {
   Q_D(Document);
-  if (srcName == distName) return false;
+  if (srcName == distName) { return false; }
   return d->workbook->copySheet(sheetNames().indexOf(srcName), distName);
 }
 

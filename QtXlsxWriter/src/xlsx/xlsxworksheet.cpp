@@ -204,11 +204,6 @@ Worksheet *Worksheet::copy(const QString &distName, int distId) const {
 }
 
 /*!
- * Destroys this workssheet.
- */
-Worksheet::~Worksheet() {}
-
-/*!
  * Returns whether sheet is protected.
  */
 Worksheet::Orientation Worksheet::orientation() const {
@@ -425,7 +420,7 @@ void Worksheet::setWhiteSpaceVisible(bool visible) {
 bool Worksheet::write(int row, int column, const QVariant &value, const Format &format) {
   Q_D(Worksheet);
 
-  if (d->checkDimensions(row, column)) return false;
+  if (d->checkDimensions(row, column)) { return false; }
 
   bool ret = true;
   if (value.isNull()) {
@@ -483,7 +478,7 @@ bool Worksheet::write(int row, int column, const QVariant &value, const Format &
  * Returns true on success.
  */
 bool Worksheet::write(const CellReference &row_column, const QVariant &value, const Format &format) {
-  if (not row_column.isValid()) return false;
+  if (not row_column.isValid()) { return false; }
 
   return write(row_column.row(), row_column.column(), value, format);
 }
@@ -570,7 +565,7 @@ Format WorksheetPrivate::cellFormat(int row, int col) const {
   Returns true on success.
  */
 bool Worksheet::writeString(const CellReference &row_column, const RichString &value, const Format &format) {
-  if (not row_column.isValid()) return false;
+  if (not row_column.isValid()) { return false; }
 
   return writeString(row_column.row(), row_column.column(), value, format);
 }
@@ -582,7 +577,7 @@ bool Worksheet::writeString(const CellReference &row_column, const RichString &v
 bool Worksheet::writeString(int row, int column, const RichString &value, const Format &format) {
   Q_D(Worksheet);
   //    QString content = value.toPlainString();
-  if (d->checkDimensions(row, column)) return false;
+  if (d->checkDimensions(row, column)) { return false; }
 
   //    if (content.size() > d->xls_strmax) {
   //        content = content.left(d->xls_strmax);
@@ -604,7 +599,7 @@ bool Worksheet::writeString(int row, int column, const RichString &value, const 
     Write string \a value to the cell \a row_column with the \a format.
  */
 bool Worksheet::writeString(const CellReference &row_column, const QString &value, const Format &format) {
-  if (not row_column.isValid()) return false;
+  if (not row_column.isValid()) { return false; }
 
   return writeString(row_column.row(), row_column.column(), value, format);
 }
@@ -617,7 +612,7 @@ bool Worksheet::writeString(const CellReference &row_column, const QString &valu
 */
 bool Worksheet::writeString(int row, int column, const QString &value, const Format &format) {
   Q_D(Worksheet);
-  if (d->checkDimensions(row, column)) return false;
+  if (d->checkDimensions(row, column)) { return false; }
 
   RichString rs;
   if (d->workbook->isHtmlToRichStringEnabled() and Qt::mightBeRichText(value))
@@ -633,7 +628,7 @@ bool Worksheet::writeString(int row, int column, const QString &value, const For
     Write string \a value to the cell \a row_column with the \a format
  */
 bool Worksheet::writeInlineString(const CellReference &row_column, const QString &value, const Format &format) {
-  if (not row_column.isValid()) return false;
+  if (not row_column.isValid()) { return false; }
 
   return writeInlineString(row_column.row(), row_column.column(), value, format);
 }
@@ -646,7 +641,7 @@ bool Worksheet::writeInlineString(int row, int column, const QString &value, con
   Q_D(Worksheet);
   // int error = 0;
   QString content = value;
-  if (d->checkDimensions(row, column)) return false;
+  if (d->checkDimensions(row, column)) { return false; }
 
   if (value.size() > XLSX_STRING_MAX) {
     content = value.left(XLSX_STRING_MAX);
@@ -665,7 +660,7 @@ bool Worksheet::writeInlineString(int row, int column, const QString &value, con
     Returns true on success.
  */
 bool Worksheet::writeNumeric(const CellReference &row_column, double value, const Format &format) {
-  if (not row_column.isValid()) return false;
+  if (not row_column.isValid()) { return false; }
 
   return writeNumeric(row_column.row(), row_column.column(), value, format);
 }
@@ -676,7 +671,7 @@ bool Worksheet::writeNumeric(const CellReference &row_column, double value, cons
 */
 bool Worksheet::writeNumeric(int row, int column, double value, const Format &format) {
   Q_D(Worksheet);
-  if (d->checkDimensions(row, column)) return false;
+  if (d->checkDimensions(row, column)) { return false; }
 
   Format fmt = format.isValid() ? format : d->cellFormat(row, column);
   d->workbook->styles()->addXfFormat(fmt);
@@ -690,7 +685,7 @@ bool Worksheet::writeNumeric(int row, int column, double value, const Format &fo
     Returns true on success.
  */
 bool Worksheet::writeFormula(const CellReference &row_column, const CellFormula &formula, const Format &format, double result) {
-  if (not row_column.isValid()) return false;
+  if (not row_column.isValid()) { return false; }
 
   return writeFormula(row_column.row(), row_column.column(), formula, format, result);
 }
@@ -701,7 +696,7 @@ bool Worksheet::writeFormula(const CellReference &row_column, const CellFormula 
 */
 bool Worksheet::writeFormula(int row, int column, const CellFormula &formula_, const Format &format, double result) {
   Q_D(Worksheet);
-  if (d->checkDimensions(row, column)) return false;
+  if (d->checkDimensions(row, column)) { return false; }
 
   Format fmt = format.isValid() ? format : d->cellFormat(row, column);
   d->workbook->styles()->addXfFormat(fmt);
@@ -748,7 +743,7 @@ bool Worksheet::writeFormula(int row, int column, const CellFormula &formula_, c
     Returns true on success.
  */
 bool Worksheet::writeBlank(const CellReference &row_column, const Format &format) {
-  if (not row_column.isValid()) return false;
+  if (not row_column.isValid()) { return false; }
 
   return writeBlank(row_column.row(), row_column.column(), format);
 }
@@ -759,7 +754,7 @@ bool Worksheet::writeBlank(const CellReference &row_column, const Format &format
  */
 bool Worksheet::writeBlank(int row, int column, const Format &format) {
   Q_D(Worksheet);
-  if (d->checkDimensions(row, column)) return false;
+  if (d->checkDimensions(row, column)) { return false; }
 
   Format fmt = format.isValid() ? format : d->cellFormat(row, column);
   d->workbook->styles()->addXfFormat(fmt);
@@ -775,7 +770,7 @@ bool Worksheet::writeBlank(int row, int column, const Format &format) {
     Returns true on success.
  */
 bool Worksheet::writeBool(const CellReference &row_column, bool value, const Format &format) {
-  if (not row_column.isValid()) return false;
+  if (not row_column.isValid()) { return false; }
 
   return writeBool(row_column.row(), row_column.column(), value, format);
 }
@@ -786,7 +781,7 @@ bool Worksheet::writeBool(const CellReference &row_column, bool value, const For
  */
 bool Worksheet::writeBool(int row, int column, bool value, const Format &format) {
   Q_D(Worksheet);
-  if (d->checkDimensions(row, column)) return false;
+  if (d->checkDimensions(row, column)) { return false; }
 
   Format fmt = format.isValid() ? format : d->cellFormat(row, column);
   d->workbook->styles()->addXfFormat(fmt);
@@ -800,7 +795,7 @@ bool Worksheet::writeBool(int row, int column, bool value, const Format &format)
     Returns true on success.
  */
 bool Worksheet::writeDateTime(const CellReference &row_column, const QDateTime &dt, const Format &format) {
-  if (not row_column.isValid()) return false;
+  if (not row_column.isValid()) { return false; }
 
   return writeDateTime(row_column.row(), row_column.column(), dt, format);
 }
@@ -811,7 +806,7 @@ bool Worksheet::writeDateTime(const CellReference &row_column, const QDateTime &
  */
 bool Worksheet::writeDateTime(int row, int column, const QDateTime &dt, const Format &format) {
   Q_D(Worksheet);
-  if (d->checkDimensions(row, column)) return false;
+  if (d->checkDimensions(row, column)) { return false; }
 
   Format fmt = format.isValid() ? format : d->cellFormat(row, column);
   if (not fmt.isValid() or not fmt.isDateTimeFormat()) fmt.setNumberFormat(d->workbook->defaultDateFormat());
@@ -830,7 +825,7 @@ bool Worksheet::writeDateTime(int row, int column, const QDateTime &dt, const Fo
     Returns true on success.
  */
 bool Worksheet::writeTime(const CellReference &row_column, const QTime &t, const Format &format) {
-  if (not row_column.isValid()) return false;
+  if (not row_column.isValid()) { return false; }
 
   return writeTime(row_column.row(), row_column.column(), t, format);
 }
@@ -841,7 +836,7 @@ bool Worksheet::writeTime(const CellReference &row_column, const QTime &t, const
  */
 bool Worksheet::writeTime(int row, int column, const QTime &t, const Format &format) {
   Q_D(Worksheet);
-  if (d->checkDimensions(row, column)) return false;
+  if (d->checkDimensions(row, column)) { return false; }
 
   Format fmt = format.isValid() ? format : d->cellFormat(row, column);
   if (not fmt.isValid() or not fmt.isDateTimeFormat()) fmt.setNumberFormat(QStringLiteral("hh:mm:ss"));
@@ -858,7 +853,7 @@ bool Worksheet::writeTime(int row, int column, const QTime &t, const Format &for
     Returns true on success.
  */
 bool Worksheet::writeHyperlink(const CellReference &row_column, const QUrl &url, const Format &format, const QString &display, const QString &tip) {
-  if (not row_column.isValid()) return false;
+  if (not row_column.isValid()) { return false; }
 
   return writeHyperlink(row_column.row(), row_column.column(), url, format, display, tip);
 }
@@ -869,7 +864,7 @@ bool Worksheet::writeHyperlink(const CellReference &row_column, const QUrl &url,
  */
 bool Worksheet::writeHyperlink(int row, int column, const QUrl &url, const Format &format, const QString &display, const QString &tip) {
   Q_D(Worksheet);
-  if (d->checkDimensions(row, column)) return false;
+  if (d->checkDimensions(row, column)) { return false; }
 
   // int error = 0;
 
@@ -921,7 +916,7 @@ bool Worksheet::writeHyperlink(int row, int column, const QUrl &url, const Forma
  */
 bool Worksheet::addDataValidation(const DataValidation &validation) {
   Q_D(Worksheet);
-  if (validation.ranges().isEmpty() or validation.validationType() == DataValidation::None) return false;
+  if (validation.ranges().isEmpty() or validation.validationType() == DataValidation::None) { return false; }
 
   d->dataValidationsList.append(validation);
   return true;
@@ -933,7 +928,7 @@ bool Worksheet::addDataValidation(const DataValidation &validation) {
  */
 bool Worksheet::addConditionalFormatting(const ConditionalFormatting &cf) {
   Q_D(Worksheet);
-  if (cf.ranges().isEmpty()) return false;
+  if (cf.ranges().isEmpty()) { return false; }
 
   for (const auto &rule : cf.d->cfRules) {
     if (not rule->dxfFormat.isEmpty()) d->workbook->styles()->addDxfFormat(rule->dxfFormat);
@@ -950,7 +945,7 @@ bool Worksheet::addConditionalFormatting(const ConditionalFormatting &cf) {
 bool Worksheet::insertImage(int row, int column, const QImage &image) {
   Q_D(Worksheet);
 
-  if (image.isNull()) return false;
+  if (image.isNull()) { return false; }
 
   if (not d->drawing) d->drawing = QSharedPointer<Drawing>(new Drawing(this, F_NewFromScratch));
 
@@ -1003,9 +998,9 @@ Chart *Worksheet::insertChart(int row, int column, const QSize &size) {
  */
 bool Worksheet::mergeCells(const CellRange &range, const Format &format) {
   Q_D(Worksheet);
-  if (range.rowCount() < 2 and range.columnCount() < 2) return false;
+  if (range.rowCount() < 2 and range.columnCount() < 2) { return false; }
 
-  if (d->checkDimensions(range.firstRow(), range.firstColumn())) return false;
+  if (d->checkDimensions(range.firstRow(), range.firstColumn())) { return false; }
 
   if (format.isValid()) d->workbook->styles()->addXfFormat(format);
 
@@ -1034,7 +1029,7 @@ bool Worksheet::mergeCells(const CellRange &range, const Format &format) {
 */
 bool Worksheet::unmergeCells(const CellRange &range) {
   Q_D(Worksheet);
-  if (not d->merges.contains(range)) return false;
+  if (not d->merges.contains(range)) { return false; }
 
   d->merges.removeOne(range);
   return true;
@@ -1191,7 +1186,7 @@ void WorksheetPrivate::saveXmlSheetData(QXmlStreamWriter &writer) const {
   }
 }
 
-void WorksheetPrivate::saveXmlCellData(QXmlStreamWriter &writer, int row, int col, QSharedPointer<Cell> cell) const {
+void WorksheetPrivate::saveXmlCellData(QXmlStreamWriter &writer, int row, int col, const QSharedPointer<Cell> &cell) const {
   // This is the innermost loop so efficiency is important.
   QString cell_pos = CellReference(row, col).toString();
 
@@ -1369,10 +1364,10 @@ bool WorksheetPrivate::isColumnRangeValid(int colFirst, int colLast) {
   bool ignore_row = true;
   bool ignore_col = false;
 
-  if (colFirst > colLast) return false;
+  if (colFirst > colLast) { return false; }
 
-  if (checkDimensions(1, colLast, ignore_row, ignore_col)) return false;
-  if (checkDimensions(1, colFirst, ignore_row, ignore_col)) return false;
+  if (checkDimensions(1, colLast, ignore_row, ignore_col)) { return false; }
+  if (checkDimensions(1, colFirst, ignore_row, ignore_col)) { return false; }
 
   return true;
 }
@@ -1398,7 +1393,7 @@ QList<int> WorksheetPrivate::getColumnIndexes(int colFirst, int colLast) {
   Returns true on success.
  */
 bool Worksheet::setColumnWidth(const CellRange &range, double width) {
-  if (not range.isValid()) return false;
+  if (not range.isValid()) { return false; }
 
   return setColumnWidth(range.firstColumn(), range.lastColumn(), width);
 }
@@ -1408,7 +1403,7 @@ bool Worksheet::setColumnWidth(const CellRange &range, double width) {
   Returns true on success.
  */
 bool Worksheet::setColumnFormat(const CellRange &range, const Format &format) {
-  if (not range.isValid()) return false;
+  if (not range.isValid()) { return false; }
 
   return setColumnFormat(range.firstColumn(), range.lastColumn(), format);
 }
@@ -1419,7 +1414,7 @@ bool Worksheet::setColumnFormat(const CellRange &range, const Format &format) {
   Returns true on success.
  */
 bool Worksheet::setColumnHidden(const CellRange &range, bool hidden) {
-  if (not range.isValid()) return false;
+  if (not range.isValid()) { return false; }
 
   return setColumnHidden(range.firstColumn(), range.lastColumn(), hidden);
 }
@@ -1601,7 +1596,7 @@ bool Worksheet::isRowHidden(int row) {
 
   int min_col = d->dimension.isValid() ? d->dimension.firstColumn() : 1;
 
-  if (d->checkDimensions(row, min_col, false, true) or not d->rowsInfo.contains(row)) return false; // return default on invalid row
+  if (d->checkDimensions(row, min_col, false, true) or not d->rowsInfo.contains(row)) { return false; } // return default on invalid row
 
   return d->rowsInfo[row]->hidden;
 }
@@ -1637,7 +1632,7 @@ bool Worksheet::groupRows(int rowFirst, int rowLast, bool collapsed) {
     Groups columns with the given \a range and \a collapsed.
  */
 bool Worksheet::groupColumns(const CellRange &range, bool collapsed) {
-  if (not range.isValid()) return false;
+  if (not range.isValid()) { return false; }
 
   return groupColumns(range.firstColumn(), range.lastColumn(), collapsed);
 }
@@ -2107,7 +2102,7 @@ void WorksheetPrivate::validateDimension() {
   int firstColumn = -1;
   int lastColumn = -1;
 
-  for (QMap<int, QMap<int, QSharedPointer<Cell>>>::const_iterator it = cellTable.begin(); it != cellTable.end(); ++it) {
+  for (QMap<int, QMap<int, QSharedPointer<Cell>>>::const_iterator it = cellTable.cbegin(); it != cellTable.cend(); ++it) {
     Q_ASSERT(not it.value().isEmpty());
 
     if (firstColumn == -1 or it.value().constBegin().key() < firstColumn) firstColumn = it.value().constBegin().key();

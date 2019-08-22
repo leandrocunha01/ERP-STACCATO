@@ -5,6 +5,7 @@
 #include <QSqlRecord>
 
 #include "anteciparrecebimento.h"
+#include "application.h"
 #include "contas.h"
 #include "doubledelegate.h"
 #include "inserirlancamento.h"
@@ -13,108 +14,94 @@
 #include "ui_widgetfinanceirocontas.h"
 #include "widgetfinanceirocontas.h"
 
-WidgetFinanceiroContas::WidgetFinanceiroContas(QWidget *parent) : Widget(parent), ui(new Ui::WidgetFinanceiroContas) {
-  ui->setupUi(this);
+WidgetFinanceiroContas::WidgetFinanceiroContas(QWidget *parent) : QWidget(parent), ui(new Ui::WidgetFinanceiroContas) { ui->setupUi(this); }
 
+WidgetFinanceiroContas::~WidgetFinanceiroContas() { delete ui; }
+
+void WidgetFinanceiroContas::setupTables() {
+  // TODO: refactor @running_total into running_total :- ifnull(running_total, 0) + ...
+  modelVencidos.setQuery("SELECT v.*, @running_total := @running_total + v.Total AS Acumulado FROM " + QString(tipo == Tipo::Receber ? "view_a_receber_vencidos_base" : "view_a_pagar_vencidos_base") +
+                         " v JOIN (SELECT @running_total := 0) r");
+
+  if (modelVencidos.lastError().isValid()) { return qApp->enqueueError("Erro atualizando tabela vencidos: " + modelVencidos.lastError().text(), this); }
+
+  ui->tableVencidos->setModel(&modelVencidos);
+
+  ui->tableVencidos->setItemDelegate(new ReaisDelegate(this));
+
+  // -------------------------------------------------------------------------
+
+  modelVencer.setQuery("SELECT v.*, @running_total := @running_total + v.Total AS Acumulado FROM " + QString(tipo == Tipo::Receber ? "view_a_receber_vencer_base" : "view_a_pagar_vencer_base") +
+                       " v JOIN (SELECT @running_total := 0) r");
+
+  if (modelVencer.lastError().isValid()) { return qApp->enqueueError("Erro atualizando tabela vencer: " + modelVencer.lastError().text(), this); }
+
+  ui->tableVencer->setModel(&modelVencer);
+
+  ui->tableVencer->setItemDelegate(new ReaisDelegate(this));
+}
+
+void WidgetFinanceiroContas::setConnections() {
+  connect(ui->dateEditAte, &QDateEdit::dateChanged, this, &WidgetFinanceiroContas::montaFiltro);
   connect(ui->dateEditDe, &QDateEdit::dateChanged, this, &WidgetFinanceiroContas::on_dateEditDe_dateChanged);
-  connect(ui->doubleSpinBoxDe, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, &WidgetFinanceiroContas::on_doubleSpinBoxDe_valueChanged);
+  connect(ui->doubleSpinBoxAte, qOverload<double>(&QDoubleSpinBox::valueChanged), this, &WidgetFinanceiroContas::montaFiltro);
+  connect(ui->doubleSpinBoxDe, qOverload<double>(&QDoubleSpinBox::valueChanged), this, &WidgetFinanceiroContas::on_doubleSpinBoxDe_valueChanged);
+  connect(ui->groupBoxData, &QGroupBox::toggled, this, &WidgetFinanceiroContas::montaFiltro);
   connect(ui->groupBoxData, &QGroupBox::toggled, this, &WidgetFinanceiroContas::on_groupBoxData_toggled);
+  connect(ui->groupBoxLojas, &QGroupBox::toggled, this, &WidgetFinanceiroContas::montaFiltro);
+  connect(ui->itemBoxLojas, &ItemBox::textChanged, this, &WidgetFinanceiroContas::montaFiltro);
+  connect(ui->lineEditBusca, &QLineEdit::textChanged, this, &WidgetFinanceiroContas::montaFiltro);
   connect(ui->pushButtonAdiantarRecebimento, &QPushButton::clicked, this, &WidgetFinanceiroContas::on_pushButtonAdiantarRecebimento_clicked);
   connect(ui->pushButtonExcluirLancamento, &QPushButton::clicked, this, &WidgetFinanceiroContas::on_pushButtonExcluirLancamento_clicked);
   connect(ui->pushButtonInserirLancamento, &QPushButton::clicked, this, &WidgetFinanceiroContas::on_pushButtonInserirLancamento_clicked);
   connect(ui->pushButtonInserirTransferencia, &QPushButton::clicked, this, &WidgetFinanceiroContas::on_pushButtonInserirTransferencia_clicked);
   connect(ui->pushButtonReverterPagamento, &QPushButton::clicked, this, &WidgetFinanceiroContas::on_pushButtonReverterPagamento_clicked);
-  connect(ui->tableVencer, &TableView::doubleClicked, this, &WidgetFinanceiroContas::on_tableVencer_doubleClicked);
-  connect(ui->tableVencer, &TableView::entered, this, &WidgetFinanceiroContas::on_tableVencer_entered);
-  connect(ui->tableVencidos, &TableView::doubleClicked, this, &WidgetFinanceiroContas::on_tableVencidos_doubleClicked);
-  connect(ui->tableVencidos, &TableView::entered, this, &WidgetFinanceiroContas::on_tableVencidos_entered);
+  connect(ui->radioButtonCancelado, &QRadioButton::clicked, this, &WidgetFinanceiroContas::montaFiltro);
+  connect(ui->radioButtonPago, &QRadioButton::clicked, this, &WidgetFinanceiroContas::montaFiltro);
+  connect(ui->radioButtonPendente, &QRadioButton::clicked, this, &WidgetFinanceiroContas::montaFiltro);
+  connect(ui->radioButtonRecebido, &QRadioButton::clicked, this, &WidgetFinanceiroContas::montaFiltro);
+  connect(ui->radioButtonTodos, &QRadioButton::clicked, this, &WidgetFinanceiroContas::montaFiltro);
   connect(ui->table, &TableView::activated, this, &WidgetFinanceiroContas::on_table_activated);
-  connect(ui->table, &TableView::entered, this, &WidgetFinanceiroContas::on_table_entered);
-
-  ui->radioButtonPendente->setChecked(true);
-  ui->dateEditAte->setDate(QDate::currentDate());
-  ui->dateEditDe->setDate(QDate::currentDate());
-
-  ui->itemBoxLojas->setSearchDialog(SearchDialog::loja(this));
-
-  setupConnections();
+  connect(ui->tableVencer, &TableView::doubleClicked, this, &WidgetFinanceiroContas::on_tableVencer_doubleClicked);
+  connect(ui->tableVencidos, &TableView::doubleClicked, this, &WidgetFinanceiroContas::on_tableVencidos_doubleClicked);
 }
 
-WidgetFinanceiroContas::~WidgetFinanceiroContas() { delete ui; }
+void WidgetFinanceiroContas::updateTables() {
+  if (not isSet) {
+    ui->radioButtonPendente->setChecked(true);
+    ui->dateEditAte->setDate(QDate::currentDate());
+    ui->dateEditDe->setDate(QDate::currentDate());
 
-void WidgetFinanceiroContas::setupTables() {
-  model.setHeaderData("dataEmissao", "Data Emissão");
-  model.setHeaderData("idVenda", "Código");
-  if (tipo == Tipo::Pagar) model.setHeaderData("ordemCompra", "OC");
-  model.setHeaderData("numeroNFe", "NFe");
-  model.setHeaderData("contraParte", "ContraParte");
-  model.setHeaderData("valor", "R$");
-  model.setHeaderData("tipo", "Tipo");
-  model.setHeaderData("parcela", "Parcela");
-  model.setHeaderData("dataPagamento", "Data Pag.");
-  model.setHeaderData("observacao", "Obs.");
-  model.setHeaderData("status", "Status");
-  model.setHeaderData("statusFinanceiro", "Status Financeiro");
+    ui->itemBoxLojas->setSearchDialog(SearchDialog::loja(this));
 
-  ui->table->setModel(&model);
-  ui->table->hideColumn("representacao");
-  ui->table->hideColumn("idPagamento");
-  ui->table->hideColumn("idLoja");
-  ui->table->setItemDelegate(new DoubleDelegate(this));
-  ui->table->setItemDelegateForColumn("valor", new ReaisDelegate(this, 2));
-
-  //
-
-  ui->tableVencidos->setModel(&modelVencidos);
-  ui->tableVencidos->setItemDelegate(new ReaisDelegate(this));
-
-  ui->tableVencer->setModel(&modelVencer);
-  ui->tableVencer->setItemDelegate(new ReaisDelegate(this));
-}
-
-void WidgetFinanceiroContas::setupConnections() {
-  connect(ui->lineEditBusca, &QLineEdit::textChanged, this, &WidgetFinanceiroContas::montaFiltro);
-  connect(ui->radioButtonCancelado, &QRadioButton::toggled, this, &WidgetFinanceiroContas::montaFiltro);
-  connect(ui->radioButtonPendente, &QRadioButton::toggled, this, &WidgetFinanceiroContas::montaFiltro);
-  connect(ui->radioButtonRecebido, &QRadioButton::toggled, this, &WidgetFinanceiroContas::montaFiltro);
-  connect(ui->radioButtonTodos, &QRadioButton::toggled, this, &WidgetFinanceiroContas::montaFiltro);
-  connect(ui->dateEditAte, &QDateEdit::dateChanged, this, &WidgetFinanceiroContas::montaFiltro);
-  connect(ui->doubleSpinBoxAte, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, &WidgetFinanceiroContas::montaFiltro);
-  connect(ui->itemBoxLojas, &ItemBox::textChanged, this, &WidgetFinanceiroContas::montaFiltro);
-  connect(ui->groupBoxLojas, &QGroupBox::toggled, this, &WidgetFinanceiroContas::montaFiltro);
-  connect(ui->groupBoxData, &QGroupBox::toggled, this, &WidgetFinanceiroContas::montaFiltro);
-}
-
-bool WidgetFinanceiroContas::updateTables() {
-  montaFiltro();
-  setupTables();
-
-  ui->table->resizeColumnsToContents();
-
-  modelVencidos.setQuery("SELECT v.*, @running_total := @running_total + v.Total AS Acumulado FROM " + QString(tipo == Tipo::Receber ? "view_a_receber_vencidos_base" : "view_a_pagar_vencidos_base") +
-                         " v JOIN (SELECT @running_total := 0) r");
-
-  if (modelVencidos.lastError().isValid()) {
-    emit errorSignal("Erro atualizando tabela vencidos: " + modelVencidos.lastError().text());
-    return false;
+    setConnections();
+    isSet = true;
   }
 
-  ui->tableVencidos->resizeColumnsToContents();
-
-  modelVencer.setQuery("SELECT v.*, @running_total := @running_total + v.Total AS Acumulado FROM " + QString(tipo == Tipo::Receber ? "view_a_receber_vencer_base" : "view_a_pagar_vencer_base") +
-                       " v JOIN (SELECT @running_total := 0) r");
-
-  if (modelVencer.lastError().isValid()) {
-    emit errorSignal("Erro atualizando tabela vencer: " + modelVencer.lastError().text());
-    return false;
+  if (not modelIsSet) {
+    montaFiltro();
+    setupTables();
+    modelIsSet = true;
   }
 
-  ui->tableVencer->resizeColumnsToContents();
+  model.setQuery(model.query().executedQuery());
 
-  return true;
+  if (model.lastError().isValid()) { return qApp->enqueueError("Erro atualizando tabela resumo: " + model.lastError().text(), this); }
+
+  // -------------------------------------------------------------------------
+
+  modelVencidos.setQuery(modelVencidos.query().executedQuery());
+
+  if (modelVencidos.lastError().isValid()) { return qApp->enqueueError("Erro atualizando tabela vencidos: " + modelVencidos.lastError().text(), this); }
+
+  // -------------------------------------------------------------------------
+
+  modelVencer.setQuery(modelVencer.query().executedQuery());
+
+  if (modelVencer.lastError().isValid()) { return qApp->enqueueError("Erro atualizando tabela vencer: " + modelVencer.lastError().text(), this); }
 }
 
-void WidgetFinanceiroContas::on_table_entered(const QModelIndex &) { ui->table->resizeColumnsToContents(); }
+void WidgetFinanceiroContas::resetTables() { modelIsSet = false; }
 
 void WidgetFinanceiroContas::on_table_activated(const QModelIndex &index) {
   auto *contas = new Contas(tipo == Tipo::Receber ? Contas::Tipo::Receber : Contas::Tipo::Pagar, this);
@@ -128,93 +115,146 @@ void WidgetFinanceiroContas::on_table_activated(const QModelIndex &index) {
 
 void WidgetFinanceiroContas::montaFiltro() {
   if (tipo == Tipo::Pagar) {
+    QStringList filtros;
     QString status;
 
-    Q_FOREACH (const auto &child, ui->groupBoxFiltros->findChildren<QRadioButton *>()) {
-      if (child->text() == "Todos") break;
+    const auto children = ui->groupBoxFiltros->findChildren<QRadioButton *>();
 
-      if (child->isChecked() and child->text() == "Pendente/Conferido") {
-        status = "(cp.status = 'PENDENTE' OR cp.status = 'CONFERIDO')";
+    for (const auto &child : children) {
+      if (child->text() == "Todos") { break; }
+
+      if (child->isChecked()) {
+        status = child->text();
         break;
       }
-
-      if (child->isChecked()) status = child->text();
     }
 
-    if (not status.isEmpty() and status != "(cp.status = 'PENDENTE' OR cp.status = 'CONFERIDO')") status = "cp.status = '" + status + "'";
+    if (ui->radioButtonPendente->isChecked()) {
+      filtros << "cp.status IN ('PENDENTE', 'CONFERIDO')";
+    } else {
+      if (not status.isEmpty()) { filtros << "cp.status = '" + status + "'"; }
+    }
 
-    const QString valor =
-        not qFuzzyIsNull(ui->doubleSpinBoxDe->value()) or not qFuzzyIsNull(ui->doubleSpinBoxAte->value())
-            ? QString(status.isEmpty() ? "" : " AND ") + "cp.valor BETWEEN " + QString::number(ui->doubleSpinBoxDe->value() - 1) + " AND " + QString::number(ui->doubleSpinBoxAte->value() + 1)
-            : "";
+    //-------------------------------------
 
-    const QString dataPag = ui->groupBoxData->isChecked() ? QString(status.isEmpty() and valor.isEmpty() ? "" : " AND ") + "cp.dataPagamento BETWEEN '" +
-                                                                ui->dateEditDe->date().toString("yyyy-MM-dd") + "' AND '" + ui->dateEditAte->date().toString("yyyy-MM-dd") + "'"
-                                                          : "";
+    const QString valor = not qFuzzyIsNull(ui->doubleSpinBoxDe->value()) or not qFuzzyIsNull(ui->doubleSpinBoxAte->value())
+                              ? "cp.valor BETWEEN " + QString::number(ui->doubleSpinBoxDe->value() - 1) + " AND " + QString::number(ui->doubleSpinBoxAte->value() + 1)
+                              : "";
+    if (not valor.isEmpty()) { filtros << valor; }
 
-    const QString loja = ui->groupBoxLojas->isChecked() and not ui->itemBoxLojas->text().isEmpty()
-                             ? QString(status.isEmpty() and valor.isEmpty() and dataPag.isEmpty() ? "" : " AND ") + "cp.idLoja = " + ui->itemBoxLojas->getValue().toString()
-                             : "";
+    //-------------------------------------
+
+    const QString dataPag =
+        ui->groupBoxData->isChecked() ? "cp.dataPagamento BETWEEN '" + ui->dateEditDe->date().toString("yyyy-MM-dd") + "' AND '" + ui->dateEditAte->date().toString("yyyy-MM-dd") + "'" : "";
+    if (not dataPag.isEmpty()) { filtros << dataPag; }
+
+    //-------------------------------------
+
+    const QString loja = ui->groupBoxLojas->isChecked() and not ui->itemBoxLojas->text().isEmpty() ? "cp.idLoja = " + ui->itemBoxLojas->getId().toString() : "";
+    if (not loja.isEmpty()) { filtros << loja; }
+
+    //-------------------------------------
 
     const QString text = ui->lineEditBusca->text();
-    const QString busca = "(ordemCompra LIKE '%" + text + "%' OR contraparte LIKE '%" + text + "%' OR numeroNFe LIKE '%" + text + "%' OR idVenda LIKE '%" + text + "%')";
+    const QString busca = text.isEmpty() ? "" : " WHERE (ordemCompra LIKE '%" + text + "%' OR contraparte LIKE '%" + text + "%' OR numeroNFe LIKE '%" + text + "%' OR idVenda LIKE '%" + text + "%')";
 
-    model.setQuery(
-        "SELECT * FROM (SELECT `cp`.`idPagamento` AS `idPagamento`, `cp`.`idLoja` AS `idLoja`, `cp`.`contraParte` AS `contraparte`, `cp`.`dataPagamento` AS `dataPagamento`, "
-        "`cp`.`dataEmissao` AS `dataEmissao`, `cp`.`valor` AS `valor`, `cp`.`status` AS `status`, group_concat(DISTINCT `pf`.`ordemCompra` SEPARATOR ',') AS `ordemCompra`, "
-        "group_concat(DISTINCT `pf`.`idVenda` SEPARATOR ', ') AS `idVenda`, group_concat(DISTINCT `n`.`numeroNFe` SEPARATOR ', ') AS `numeroNFe`, `cp`.`tipo` AS `tipo`, `cp`.`parcela` AS "
-        "`parcela`, `cp`.`observacao` AS `observacao`, group_concat(DISTINCT `pf`.`statusFinanceiro` SEPARATOR ',') AS `statusFinanceiro` FROM ((((`mydb`.`conta_a_pagar_has_pagamento` `cp` "
-        "LEFT JOIN `mydb`.`pedido_fornecedor_has_produto` `pf` ON ((`cp`.`idCompra` = `pf`.`idCompra`))) LEFT JOIN `mydb`.`estoque_has_compra` `ehc` ON ((`ehc`.`idCompra` = "
-        "`cp`.`idCompra`))) LEFT JOIN `mydb`.`estoque_has_nfe` `ehn` ON ((`ehc`.`idEstoque` = `ehn`.`idEstoque`))) LEFT JOIN `mydb`.`nfe` `n` ON ((`n`.`idNFe` = `ehn`.`idNFe`))) WHERE " +
-        status + valor + dataPag + loja + QString(status.isEmpty() and valor.isEmpty() and dataPag.isEmpty() and loja.isEmpty() ? "" : " AND ") +
-        "`cp`.`desativado` = FALSE GROUP BY `cp`.`idPagamento` ORDER BY `cp`.`dataPagamento`) view WHERE " + busca + " ORDER BY `dataPagamento` , `idVenda` , `tipo` , `parcela` DESC");
+    //-------------------------------------
+
+    filtros << "cp.desativado = FALSE";
+
+    model.setQuery("SELECT * FROM (SELECT `cp`.`idPagamento` AS `idPagamento`, `cp`.`idLoja` AS `idLoja`, `cp`.`contraParte` AS `contraparte`, `cp`.`dataPagamento` AS `dataPagamento`, "
+                   "`cp`.`dataEmissao` AS `dataEmissao`, `cp`.`valor` AS `valor`, `cp`.`status` AS `status`, GROUP_CONCAT(DISTINCT `pf`.`ordemCompra` SEPARATOR ',') AS `ordemCompra`, "
+                   "GROUP_CONCAT(DISTINCT `pf`.`idVenda` SEPARATOR ', ') AS `idVenda`, GROUP_CONCAT(DISTINCT `n`.`numeroNFe` SEPARATOR ', ') AS `numeroNFe`, `cp`.`tipo` AS `tipo`, `cp`.`parcela` AS "
+                   "`parcela`, `cp`.`observacao` AS `observacao`, GROUP_CONCAT(DISTINCT `pf`.`statusFinanceiro` SEPARATOR ',') AS `statusFinanceiro` FROM `conta_a_pagar_has_pagamento` `cp` "
+                   "LEFT JOIN `pedido_fornecedor_has_produto` `pf` ON `cp`.`idCompra` = `pf`.`idCompra` LEFT JOIN `estoque_has_compra` `ehc` ON `ehc`.`idPedido` = `pf`.`idPedido` LEFT JOIN `estoque` "
+                   "`e` ON `ehc`.`idEstoque` = `e`.`idEstoque` LEFT JOIN `nfe` `n` ON `n`.`idNFe` = `e`.`idNFe` WHERE " +
+                   filtros.join(" AND ") + " GROUP BY `cp`.`idPagamento`) x" + busca);
   }
 
   if (tipo == Tipo::Receber) {
+    QStringList filtros;
     QString status;
 
-    Q_FOREACH (const auto &child, ui->groupBoxFiltros->findChildren<QRadioButton *>()) {
-      if (child->text() == "Todos") break;
+    const auto children = ui->groupBoxFiltros->findChildren<QRadioButton *>();
 
-      if (child->isChecked() and child->text() == "Pendente/Conferido") {
-        status = "(cr.status = 'PENDENTE' OR cr.status = 'CONFERIDO')";
+    for (const auto &child : children) {
+      if (child->text() == "Todos") { break; }
+
+      if (child->isChecked()) {
+        status = child->text();
         break;
       }
-
-      if (child->isChecked()) status = child->text();
     }
 
-    if (not status.isEmpty() and status != "(cr.status = 'PENDENTE' OR cr.status = 'CONFERIDO')") status = "cr.status = '" + status + "'";
+    if (ui->radioButtonPendente->isChecked()) {
+      filtros << "cr.status IN ('PENDENTE', 'CONFERIDO')";
+    } else {
+      if (not status.isEmpty()) { filtros << "cr.status = '" + status + "'"; }
+    }
 
-    const QString valor =
-        not qFuzzyIsNull(ui->doubleSpinBoxDe->value()) or not qFuzzyIsNull(ui->doubleSpinBoxAte->value())
-            ? QString(status.isEmpty() ? "" : " AND ") + "cr.valor BETWEEN " + QString::number(ui->doubleSpinBoxDe->value() - 1) + " AND " + QString::number(ui->doubleSpinBoxAte->value() + 1)
-            : "";
+    //-------------------------------------
 
-    const QString dataPag = ui->groupBoxData->isChecked() ? QString(status.isEmpty() and valor.isEmpty() ? "" : " AND ") + "cr.dataPagamento BETWEEN '" +
-                                                                ui->dateEditDe->date().toString("yyyy-MM-dd") + "' AND '" + ui->dateEditAte->date().toString("yyyy-MM-dd") + "'"
-                                                          : "";
+    const QString valor = not qFuzzyIsNull(ui->doubleSpinBoxDe->value()) or not qFuzzyIsNull(ui->doubleSpinBoxAte->value())
+                              ? "cr.valor BETWEEN " + QString::number(ui->doubleSpinBoxDe->value() - 1) + " AND " + QString::number(ui->doubleSpinBoxAte->value() + 1)
+                              : "";
+    if (not valor.isEmpty()) { filtros << valor; }
 
-    const QString loja = ui->groupBoxLojas->isChecked() and not ui->itemBoxLojas->text().isEmpty()
-                             ? QString(status.isEmpty() and valor.isEmpty() and dataPag.isEmpty() ? "" : " AND ") + "cr.idLoja = " + ui->itemBoxLojas->getValue().toString()
-                             : "";
+    //-------------------------------------
+
+    const QString dataPag =
+        ui->groupBoxData->isChecked() ? "cr.dataPagamento BETWEEN '" + ui->dateEditDe->date().toString("yyyy-MM-dd") + "' AND '" + ui->dateEditAte->date().toString("yyyy-MM-dd") + "'" : "";
+    if (not dataPag.isEmpty()) { filtros << dataPag; }
+
+    //-------------------------------------
+
+    const QString loja = ui->groupBoxLojas->isChecked() and not ui->itemBoxLojas->text().isEmpty() ? "cr.idLoja = " + ui->itemBoxLojas->getId().toString() : "";
+    if (not loja.isEmpty()) { filtros << loja; }
+
+    //-------------------------------------
 
     const QString text = ui->lineEditBusca->text();
-    const QString busca =
-        QString(status.isEmpty() and valor.isEmpty() and dataPag.isEmpty() and loja.isEmpty() ? "" : " AND ") + "(cr.idVenda LIKE '%" + text + "%' OR cr.contraparte LIKE '%" + text + "%')";
+    const QString busca = "(cr.idVenda LIKE '%" + text + "%' OR cr.contraparte LIKE '%" + text + "%')";
+    if (not text.isEmpty()) { filtros << busca; }
+
+    //-------------------------------------
+
+    filtros << "cr.desativado = FALSE";
+    filtros << "cr.representacao = FALSE";
 
     model.setQuery("SELECT `cr`.`idPagamento` AS `idPagamento`, `cr`.`idLoja` AS `idLoja`, `cr`.`representacao` AS `representacao`, `cr`.`contraParte` AS `contraparte`, `cr`.`dataPagamento` AS "
                    "`dataPagamento`, `cr`.`dataEmissao` AS `dataEmissao`, `cr`.`idVenda` AS `idVenda`, `cr`.`valor` AS `valor`, `cr`.`tipo` AS `tipo`, `cr`.`parcela` AS `parcela`, `cr`.`observacao` "
-                   "AS `observacao`, `cr`.`status` AS `status`, `v`.`statusFinanceiro` AS `statusFinanceiro` FROM (`mydb`.`conta_a_receber_has_pagamento` `cr` LEFT JOIN `mydb`.`venda` `v` ON "
+                   "AS `observacao`, `cr`.`status` AS `status`, `v`.`statusFinanceiro` AS `statusFinanceiro` FROM (`conta_a_receber_has_pagamento` `cr` LEFT JOIN `venda` `v` ON "
                    "((`cr`.`idVenda` = `v`.`idVenda`))) WHERE " +
-                   status + valor + dataPag + loja + busca +
-                   " AND `cr`.`desativado` = FALSE AND `cr`.`representacao` = FALSE GROUP BY `cr`.`idPagamento` ORDER BY `cr`.`dataPagamento`, `cr`.`idVenda`, "
-                   "`cr`.`tipo`, `cr`.`parcela` DESC");
+                   filtros.join(" AND ") + " GROUP BY `cr`.`idPagamento` ORDER BY `cr`.`dataPagamento`, `cr`.`idVenda`, `cr`.`tipo`, `cr`.`parcela` DESC");
   }
 
-  if (model.lastError().isValid()) emit errorSignal("Erro lendo tabela: " + model.lastError().text());
+  if (model.lastError().isValid()) { return qApp->enqueueError("Erro lendo tabela: " + model.lastError().text(), this); }
 
-  ui->table->resizeColumnsToContents();
+  model.setHeaderData("dataEmissao", "Data Emissão");
+  model.setHeaderData("idVenda", "Código");
+
+  if (tipo == Tipo::Pagar) {
+    model.setHeaderData("ordemCompra", "OC");
+    model.setHeaderData("numeroNFe", "NFe");
+  }
+
+  model.setHeaderData("contraParte", "ContraParte");
+  model.setHeaderData("valor", "R$");
+  model.setHeaderData("tipo", "Tipo");
+  model.setHeaderData("parcela", "Parcela");
+  model.setHeaderData("dataPagamento", "Data Pag.");
+  model.setHeaderData("observacao", "Obs.");
+  model.setHeaderData("status", "Status");
+  model.setHeaderData("statusFinanceiro", "Status Financeiro");
+
+  model.proxyModel = new SortFilterProxyModel(&model, this);
+
+  ui->table->setModel(&model);
+  ui->table->hideColumn("representacao");
+  ui->table->hideColumn("idPagamento");
+  ui->table->hideColumn("idLoja");
+  ui->table->setItemDelegate(new DoubleDelegate(this));
+  ui->table->setItemDelegateForColumn("valor", new ReaisDelegate(this, 2));
 }
 
 void WidgetFinanceiroContas::on_pushButtonInserirLancamento_clicked() {
@@ -239,18 +279,20 @@ void WidgetFinanceiroContas::setTipo(const Tipo &value) {
   if (tipo == Tipo::Pagar) {
     ui->pushButtonAdiantarRecebimento->hide();
     ui->radioButtonRecebido->hide();
+    ui->lineEditBusca->setPlaceholderText("OC/Contraparte/NFe/Venda");
   }
 
-  if (tipo == Tipo::Receber) { ui->radioButtonPago->hide(); }
+  if (tipo == Tipo::Receber) {
+    ui->radioButtonPago->hide();
+    ui->lineEditBusca->setPlaceholderText("Venda/Contraparte");
+  }
 }
 
 void WidgetFinanceiroContas::on_groupBoxData_toggled(const bool enabled) {
-  Q_FOREACH (const auto &child, ui->groupBoxData->findChildren<QDateEdit *>()) { child->setEnabled(enabled); }
+  const auto children = ui->groupBoxData->findChildren<QDateEdit *>();
+
+  for (const auto &child : children) { child->setEnabled(enabled); }
 }
-
-void WidgetFinanceiroContas::on_tableVencidos_entered(const QModelIndex &) { ui->tableVencidos->resizeColumnsToContents(); }
-
-void WidgetFinanceiroContas::on_tableVencer_entered(const QModelIndex &) { ui->tableVencer->resizeColumnsToContents(); }
 
 void WidgetFinanceiroContas::on_tableVencidos_doubleClicked(const QModelIndex &index) {
   ui->dateEditDe->setDate(modelVencidos.record(index.row()).value("Data Pagamento").toDate());
@@ -283,10 +325,7 @@ void WidgetFinanceiroContas::on_pushButtonExcluirLancamento_clicked() {
 
   const auto list = ui->table->selectionModel()->selectedRows();
 
-  if (list.isEmpty()) {
-    emit errorSignal("Nenhuma linha selecionada!");
-    return;
-  }
+  if (list.isEmpty()) { return qApp->enqueueError("Nenhuma linha selecionada!", this); }
 
   QMessageBox msgBox(QMessageBox::Question, "Atenção!", "Tem certeza que deseja excluir?", QMessageBox::Yes | QMessageBox::No, this);
   msgBox.setButtonText(QMessageBox::Yes, "Excluir");
@@ -297,14 +336,11 @@ void WidgetFinanceiroContas::on_pushButtonExcluirLancamento_clicked() {
     query.prepare("UPDATE " + QString(tipo == Tipo::Pagar ? "conta_a_pagar_has_pagamento" : "conta_a_receber_has_pagamento") + " SET desativado = TRUE WHERE idPagamento = :idPagamento");
     query.bindValue(":idPagamento", model.data(list.first().row(), "idPagamento"));
 
-    if (not query.exec()) {
-      emit errorSignal("Erro excluindo lançamento: " + query.lastError().text());
-      return;
-    }
+    if (not query.exec()) { return qApp->enqueueError("Erro excluindo lançamento: " + query.lastError().text(), this); }
 
     montaFiltro();
 
-    emit informationSignal("Lançamento excluído com sucesso!");
+    qApp->enqueueInformation("Lançamento excluído com sucesso!", this);
   }
 }
 
@@ -313,29 +349,17 @@ void WidgetFinanceiroContas::on_pushButtonExcluirLancamento_clicked() {
 void WidgetFinanceiroContas::on_pushButtonReverterPagamento_clicked() {
   const auto list = ui->table->selectionModel()->selectedRows();
 
-  if (list.isEmpty()) {
-    emit errorSignal("Nenhuma linha selecionada!");
-    return;
-  }
+  if (list.isEmpty()) { return qApp->enqueueError("Nenhuma linha selecionada!", this); }
 
   QSqlQuery queryPagamento;
   queryPagamento.prepare("SELECT dataPagamento, grupo FROM " + QString(tipo == Tipo::Pagar ? "conta_a_pagar_has_pagamento" : "conta_a_receber_has_pagamento") + " WHERE idPagamento = :idPagamento");
   queryPagamento.bindValue(":idPagamento", model.data(list.first().row(), "idPagamento"));
 
-  if (not queryPagamento.exec() or not queryPagamento.first()) {
-    emit errorSignal("Erro buscando pagamento: " + queryPagamento.lastError().text());
-    return;
-  }
+  if (not queryPagamento.exec() or not queryPagamento.first()) { return qApp->enqueueError("Erro buscando pagamento: " + queryPagamento.lastError().text(), this); }
 
-  if (queryPagamento.value("dataPagamento").toDate().daysTo(QDate::currentDate()) > 5) {
-    emit errorSignal("No máximo 5 dias para reverter!");
-    return;
-  }
+  if (queryPagamento.value("dataPagamento").toDate().daysTo(QDate::currentDate()) > 5) { return qApp->enqueueError("No máximo 5 dias para reverter!", this); }
 
-  if (queryPagamento.value("grupo").toString() == "Transferência") {
-    emit errorSignal("Não pode reverter transferência!");
-    return;
-  }
+  if (queryPagamento.value("grupo").toString() == "Transferência") { return qApp->enqueueError("Não pode reverter transferência!", this); }
 
   QMessageBox msgBox(QMessageBox::Question, "Atenção!", "Tem certeza que deseja reverter?", QMessageBox::Yes | QMessageBox::No, this);
   msgBox.setButtonText(QMessageBox::Yes, "Reverter");
@@ -346,13 +370,10 @@ void WidgetFinanceiroContas::on_pushButtonReverterPagamento_clicked() {
     query.prepare("UPDATE " + QString(tipo == Tipo::Pagar ? "conta_a_pagar_has_pagamento" : "conta_a_receber_has_pagamento") + " SET status = 'PENDENTE' WHERE idPagamento = :idPagamento");
     query.bindValue(":idPagamento", model.data(list.first().row(), "idPagamento"));
 
-    if (not query.exec()) {
-      emit errorSignal("Erro revertendo lançamento: " + query.lastError().text());
-      return;
-    }
+    if (not query.exec()) { return qApp->enqueueError("Erro revertendo lançamento: " + query.lastError().text(), this); }
 
     updateTables();
 
-    emit informationSignal("Lançamento revertido com sucesso!");
+    qApp->enqueueInformation("Lançamento revertido com sucesso!", this);
   }
 }

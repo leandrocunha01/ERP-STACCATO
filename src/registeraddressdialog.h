@@ -1,16 +1,17 @@
-#ifndef REGISTERADDRESSDIALOG_H
-#define REGISTERADDRESSDIALOG_H
+#pragma once
 
 #include "registerdialog.h"
+
+#include <QSqlRecord>
 
 class RegisterAddressDialog : public RegisterDialog {
 
 public:
-  explicit RegisterAddressDialog(const QString &table, const QString &primaryKey, QWidget *parent);
-  auto viewRegisterById(const QVariant &id) -> bool final;
+  explicit RegisterAddressDialog(const QString &table, const QString &primaryKey, QWidget *parent = nullptr);
 
 protected:
   // attributes
+  QList<QSqlRecord> backupEndereco;
   int currentRowEnd = -1;
   QDataWidgetMapper mapperEnd;
   SqlRelationalTableModel modelEnd;
@@ -22,5 +23,3 @@ protected:
 private:
   auto setupTables(const QString &table) -> void;
 };
-
-#endif // REGISTERADDRESSDIALOG_H

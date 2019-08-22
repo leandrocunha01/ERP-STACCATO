@@ -2384,7 +2384,7 @@ Operação com Direito a Crédito - Vinculada a Receitas Tributadas e Não-Tribu
                        <item row="7" column="0" colspan="2">
                         <widget class="QDoubleSpinBox" name="doubleSpinBoxFcpDestino">
                          <property name="readOnly">
-                          <bool>true</bool>
+                          <bool>false</bool>
                          </property>
                          <property name="prefix">
                           <string>R$ </string>
@@ -2397,7 +2397,7 @@ Operação com Direito a Crédito - Vinculada a Receitas Tributadas e Não-Tribu
                        <item row="6" column="0" colspan="2">
                         <widget class="QDoubleSpinBox" name="doubleSpinBoxPartilhaRemetente">
                          <property name="readOnly">
-                          <bool>true</bool>
+                          <bool>false</bool>
                          </property>
                          <property name="prefix">
                           <string>R$ </string>
@@ -2410,7 +2410,7 @@ Operação com Direito a Crédito - Vinculada a Receitas Tributadas e Não-Tribu
                        <item row="2" column="0" colspan="2">
                         <widget class="QDoubleSpinBox" name="doubleSpinBoxAliquotaInternaDestinatario">
                          <property name="readOnly">
-                          <bool>true</bool>
+                          <bool>false</bool>
                          </property>
                          <property name="suffix">
                           <string>%</string>
@@ -2423,7 +2423,7 @@ Operação com Direito a Crédito - Vinculada a Receitas Tributadas e Não-Tribu
                        <item row="4" column="0" colspan="2">
                         <widget class="QDoubleSpinBox" name="doubleSpinBoxPercentualPartilha">
                          <property name="readOnly">
-                          <bool>true</bool>
+                          <bool>false</bool>
                          </property>
                          <property name="suffix">
                           <string>%</string>
@@ -2436,7 +2436,7 @@ Operação com Direito a Crédito - Vinculada a Receitas Tributadas e Não-Tribu
                        <item row="5" column="0" colspan="2">
                         <widget class="QDoubleSpinBox" name="doubleSpinBoxPartilhaDestinatario">
                          <property name="readOnly">
-                          <bool>true</bool>
+                          <bool>false</bool>
                          </property>
                          <property name="prefix">
                           <string>R$ </string>
@@ -2449,7 +2449,7 @@ Operação com Direito a Crédito - Vinculada a Receitas Tributadas e Não-Tribu
                        <item row="3" column="0" colspan="2">
                         <widget class="QDoubleSpinBox" name="doubleSpinBoxAliquotaInter">
                          <property name="readOnly">
-                          <bool>true</bool>
+                          <bool>false</bool>
                          </property>
                          <property name="suffix">
                           <string>%</string>
@@ -2462,7 +2462,7 @@ Operação com Direito a Crédito - Vinculada a Receitas Tributadas e Não-Tribu
                        <item row="0" column="0" colspan="2">
                         <widget class="QDoubleSpinBox" name="doubleSpinBoxPercentualFcpDestino">
                          <property name="readOnly">
-                          <bool>true</bool>
+                          <bool>false</bool>
                          </property>
                          <property name="suffix">
                           <string>%</string>
@@ -2475,7 +2475,7 @@ Operação com Direito a Crédito - Vinculada a Receitas Tributadas e Não-Tribu
                        <item row="1" column="0" colspan="2">
                         <widget class="QDoubleSpinBox" name="doubleSpinBoxBaseCalculoDestinatario">
                          <property name="readOnly">
-                          <bool>true</bool>
+                          <bool>false</bool>
                          </property>
                          <property name="prefix">
                           <string>R$ </string>

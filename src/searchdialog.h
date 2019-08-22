@@ -1,26 +1,24 @@
-#ifndef SEARCHDIALOG_H
-#define SEARCHDIALOG_H
+#pragma once
 
-#include <QDataWidgetMapper>
+#include <QDialog>
 
-#include "dialog.h"
+#include "searchdialogproxymodel.h"
 #include "sqlrelationaltablemodel.h"
 
 namespace Ui {
 class SearchDialog;
 }
 
-class SearchDialog final : public Dialog {
+class SearchDialog final : public QDialog {
   Q_OBJECT
 
 public:
-  explicit SearchDialog(const QString &title, const QString &table, const QStringList &indexes, const QString &filter, const bool permitirDescontinuados, QWidget *parent = nullptr);
   ~SearchDialog() final;
   auto getFilter() const -> QString;
-  auto getText(const QVariant &value) -> QString;
-  auto setFilter(const QString &value) -> void;
-  auto setFornecedorRep(const QString &value) -> void;
-  auto setRepresentacao(const QString &value) -> void;
+  auto getText(const QVariant &id) -> QString;
+  auto setFilter(const QString &newFilter) -> void;
+  auto setFornecedorRep(const QString &newFornecedorRep) -> void;
+  auto setRepresentacao(const bool isRepresentacao) -> void;
   auto show() -> void;
   auto showMaximized() -> void;
 
@@ -30,40 +28,41 @@ public:
   static auto enderecoCliente(QWidget *parent) -> SearchDialog *;
   static auto fornecedor(QWidget *parent) -> SearchDialog *;
   static auto loja(QWidget *parent) -> SearchDialog *;
-  static auto produto(const bool permitirDescontinuados, QWidget *parent) -> SearchDialog *;
-  static auto profissional(QWidget *parent) -> SearchDialog *;
+  static auto produto(const bool permitirDescontinuados, const bool silent, const bool showAllProdutos, QWidget *parent) -> SearchDialog *;
+  static auto profissional(const bool mostrarNaoHa, QWidget *parent) -> SearchDialog *;
   static auto transportadora(QWidget *parent) -> SearchDialog *;
   static auto usuario(QWidget *parent) -> SearchDialog *;
   static auto veiculo(QWidget *parent) -> SearchDialog *;
   static auto vendedor(QWidget *parent) -> SearchDialog *;
 
 signals:
-  void itemSelected(const QVariant &value);
+  void itemSelected(const QVariant &id);
 
 private:
   // attributes
-  const QStringList indexes;
-  const bool permitirDescontinuados;
+  const QString primaryKey;
+  const QString fullTextIndex;
+  const QStringList textKeys;
+  bool permitirDescontinuados = false;
+  bool silent = false;
+  bool isRepresentacao = false;
+  bool showAllProdutos = false;
+  bool isSet = false;
   QString filter;
-  QString fornecedorRep; // REFAC: verificar se isso não é a mesma coisa de 'representacao'
-  QString primaryKey;
-  QString representacao;
-  QStringList textKeys;
+  QString fornecedorRep;
   SqlRelationalTableModel model;
   Ui::SearchDialog *ui;
   // methods
+  explicit SearchDialog(const QString &title, const QString &table, const QString &primaryKey, const QStringList &textKeys, const QString &fullTextIndex, const QString &filter,
+                        QWidget *parent = nullptr);
   auto hideColumns(const QStringList &columns) -> void;
   auto on_lineEditBusca_textChanged(const QString &) -> void;
   auto on_pushButtonSelecionar_clicked() -> void;
   auto on_radioButtonProdAtivos_toggled(const bool) -> void;
   auto on_radioButtonProdDesc_toggled(const bool) -> void;
   auto on_table_doubleClicked(const QModelIndex &) -> void;
-  auto on_table_entered(const QModelIndex &) -> void;
+  auto prepare_show() -> bool;
   auto sendUpdateMessage() -> void;
-  auto setHeaderData(const QString &column, const QString &value) -> void;
-  auto setPrimaryKey(const QString &value) -> void;
-  auto setTextKeys(const QStringList &value) -> void;
-  auto setupTables(const QString &table, const QString &filter) -> void;
+  auto setHeaderData(const QString &column, const QString &newHeader) -> void;
+  auto setupTables(const QString &table) -> void;
 };
-
-#endif // SEARCHDIALOG_H

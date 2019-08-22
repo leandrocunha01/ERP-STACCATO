@@ -1,5 +1,4 @@
-#ifndef ITEMBOX_H
-#define ITEMBOX_H
+#pragma once
 
 #include <QLineEdit>
 #include <QPushButton>
@@ -11,27 +10,29 @@ class ItemBox final : public QLineEdit {
   Q_OBJECT
 
 public:
-  explicit ItemBox(QWidget *parent);
+  explicit ItemBox(QWidget *parent = nullptr);
   ~ItemBox() = default;
-  auto changeItem(const QVariant &value) -> void;
+  auto changeItem(const QVariant &newId) -> void;
   auto clear() -> void;
-  auto getSearchDialog() -> SearchDialog *;
-  auto getValue() const -> QVariant;
+  auto getId() const -> QVariant;
+  auto setFilter(const QString &filter) -> void;
+  auto setFornecedorRep(const QString &fornecedor) -> void;
   auto setReadOnlyItemBox(const bool isReadOnly) -> void;
-  auto setRegisterDialog(RegisterDialog *value) -> void;
-  auto setSearchDialog(SearchDialog *value) -> void;
-  auto setValue(const QVariant &value) -> void;
+  auto setRegisterDialog(RegisterDialog *dialog) -> void;
+  auto setRepresentacao(const bool isRepresentacao) -> void;
+  auto setSearchDialog(SearchDialog *dialog) -> void;
+  auto setId(const QVariant &newId) -> void;
 
 signals:
-  void valueChanged(const QVariant &value);
+  void idChanged(const QVariant &changedId);
 
 private:
-  Q_PROPERTY(QVariant value READ getValue WRITE setValue STORED false)
+  Q_PROPERTY(QVariant id READ getId WRITE setId STORED false)
   // attributes
   bool readOnlyItemBox = false;
   QPushButton *searchButton;
   QPushButton *plusButton;
-  QVariant value;
+  QVariant id;
   RegisterDialog *registerDialog = nullptr;
   SearchDialog *searchDialog = nullptr;
   // methods
@@ -40,6 +41,5 @@ private:
   auto resetCursor() -> void;
   auto resizeEvent(QResizeEvent *event) -> void final;
   auto search() -> void;
+  auto setIcons() -> void;
 };
-
-#endif // ITEMBOX_H

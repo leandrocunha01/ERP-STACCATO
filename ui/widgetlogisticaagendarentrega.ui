@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1168</width>
+    <width>1205</width>
     <height>796</height>
    </rect>
   </property>
@@ -29,18 +29,12 @@
       <string>Filtros:</string>
      </property>
      <layout class="QGridLayout" name="gridLayout_12">
-      <item row="5" column="0">
-       <spacer name="verticalSpacer_5">
-        <property name="orientation">
-         <enum>Qt::Vertical</enum>
+      <item row="3" column="0">
+       <widget class="QRadioButton" name="radioButtonSemEstoque">
+        <property name="text">
+         <string>Sem estoque</string>
         </property>
-        <property name="sizeHint" stdset="0">
-         <size>
-          <width>20</width>
-          <height>290</height>
-         </size>
-        </property>
-       </spacer>
+       </widget>
       </item>
       <item row="1" column="0">
        <widget class="QRadioButton" name="radioButtonTotalEstoque">
@@ -59,24 +53,23 @@
         </property>
        </widget>
       </item>
+      <item row="4" column="0">
+       <spacer name="verticalSpacer_5">
+        <property name="orientation">
+         <enum>Qt::Vertical</enum>
+        </property>
+        <property name="sizeHint" stdset="0">
+         <size>
+          <width>20</width>
+          <height>290</height>
+         </size>
+        </property>
+       </spacer>
+      </item>
       <item row="2" column="0">
        <widget class="QRadioButton" name="radioButtonParcialEstoque">
         <property name="text">
          <string>Parte estoque</string>
-        </property>
-       </widget>
-      </item>
-      <item row="3" column="0">
-       <widget class="QRadioButton" name="radioButtonSemEstoque">
-        <property name="text">
-         <string>Sem estoque</string>
-        </property>
-       </widget>
-      </item>
-      <item row="4" column="0">
-       <widget class="QCheckBox" name="checkBoxMostrarSul">
-        <property name="text">
-         <string>Sul</string>
         </property>
        </widget>
       </item>
@@ -90,7 +83,7 @@
      </property>
      <widget class="QWidget" name="layoutWidget">
       <layout class="QGridLayout" name="gridLayout_8">
-       <item row="6" column="0">
+       <item row="7" column="0">
         <layout class="QGridLayout" name="gridLayout_3">
          <item row="0" column="0">
           <widget class="QLabel" name="label_2">
@@ -207,12 +200,6 @@
          <property name="sortingEnabled">
           <bool>true</bool>
          </property>
-         <attribute name="horizontalHeaderCascadingSectionResizes">
-          <bool>true</bool>
-         </attribute>
-         <attribute name="horizontalHeaderStretchLastSection">
-          <bool>false</bool>
-         </attribute>
         </widget>
        </item>
        <item row="4" column="0">
@@ -240,6 +227,9 @@
           <widget class="QLineEdit" name="lineEditBusca">
            <property name="enabled">
             <bool>true</bool>
+           </property>
+           <property name="placeholderText">
+            <string>Venda/Bairro/Logradouro/Cidade</string>
            </property>
           </widget>
          </item>
@@ -277,13 +267,6 @@
          </property>
          <property name="sortingEnabled">
           <bool>true</bool>
-         </property>
-        </widget>
-       </item>
-       <item row="3" column="0">
-        <widget class="QPushButton" name="pushButtonReagendarPedido">
-         <property name="text">
-          <string>Reagendar</string>
          </property>
         </widget>
        </item>
@@ -421,6 +404,20 @@
          </property>
         </widget>
        </item>
+       <item row="3" column="0">
+        <widget class="QPushButton" name="pushButtonReagendarPedido">
+         <property name="text">
+          <string>Reagendar</string>
+         </property>
+        </widget>
+       </item>
+       <item row="6" column="0">
+        <widget class="QPushButton" name="pushButtonGerarNFeFutura">
+         <property name="text">
+          <string>Gerar NFe Futura</string>
+         </property>
+        </widget>
+       </item>
       </layout>
      </widget>
      <widget class="QFrame" name="frameCaminhao">
@@ -432,7 +429,7 @@
          </property>
          <layout class="QGridLayout" name="gridLayout_6">
           <item row="0" column="0">
-           <widget class="TableView" name="tableTransp2">
+           <widget class="TableView" name="tableTranspAgend">
             <property name="palette">
              <palette>
               <active>
@@ -511,7 +508,7 @@
            </widget>
           </item>
           <item row="0" column="0" colspan="3">
-           <widget class="TableView" name="tableTransp">
+           <widget class="TableView" name="tableTranspAtual">
             <property name="palette">
              <palette>
               <active>

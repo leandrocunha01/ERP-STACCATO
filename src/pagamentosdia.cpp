@@ -7,7 +7,7 @@
 #include "reaisdelegate.h"
 #include "ui_pagamentosdia.h"
 
-PagamentosDia::PagamentosDia(QWidget *parent) : Dialog(parent), ui(new Ui::PagamentosDia) {
+PagamentosDia::PagamentosDia(QWidget *parent) : QDialog(parent), ui(new Ui::PagamentosDia) {
   ui->setupUi(this);
 
   setWindowFlags(Qt::Window);
@@ -37,12 +37,9 @@ void PagamentosDia::setupTables() {
 bool PagamentosDia::setFilter(const QDate &date, const QString &idConta) {
   const QString filtroConta = idConta.isEmpty() ? "" : "AND idConta = " + idConta;
 
-  modelViewFluxoCaixa.setFilter("`Data` = '" + date.toString("yyyy-MM-dd") + "' AND (status = 'PAGO' OR status = 'RECEBIDO') " + filtroConta);
+  modelViewFluxoCaixa.setFilter("`Data` = '" + date.toString("yyyy-MM-dd") + "' AND status IN ('PAGO', 'RECEBIDO') " + filtroConta);
 
-  if (not modelViewFluxoCaixa.select()) {
-    emit errorSignal("Erro lendo tabela: " + modelViewFluxoCaixa.lastError().text());
-    return false;
-  }
+  if (not modelViewFluxoCaixa.select()) { return false; }
 
   setWindowTitle(date.toString("dd/MM/yyyy"));
 

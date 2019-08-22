@@ -4,19 +4,16 @@
 #include <QSqlError>
 #include <QSqlQuery>
 
+#include "application.h"
+#include "cancelaproduto.h"
 #include "inputdialogfinanceiro.h"
 #include "reaisdelegate.h"
 #include "sql.h"
 #include "ui_widgetcompraconfirmar.h"
 #include "widgetcompraconfirmar.h"
 
-WidgetCompraConfirmar::WidgetCompraConfirmar(QWidget *parent) : Widget(parent), ui(new Ui::WidgetCompraConfirmar) {
+WidgetCompraConfirmar::WidgetCompraConfirmar(QWidget *parent) : QWidget(parent), ui(new Ui::WidgetCompraConfirmar) {
   ui->setupUi(this);
-
-  connect(ui->checkBoxMostrarSul, &QCheckBox::toggled, this, &WidgetCompraConfirmar::on_checkBoxMostrarSul_toggled);
-  connect(ui->pushButtonCancelarCompra, &QPushButton::clicked, this, &WidgetCompraConfirmar::on_pushButtonCancelarCompra_clicked);
-  connect(ui->pushButtonConfirmarCompra, &QPushButton::clicked, this, &WidgetCompraConfirmar::on_pushButtonConfirmarCompra_clicked);
-  connect(ui->table, &TableView::entered, this, &WidgetCompraConfirmar::on_table_entered);
 
   ui->splitter->setStretchFactor(0, 0);
   ui->splitter->setStretchFactor(1, 1);
@@ -27,60 +24,61 @@ WidgetCompraConfirmar::~WidgetCompraConfirmar() { delete ui; }
 void WidgetCompraConfirmar::setupTables() {
   modelResumo.setTable("view_fornecedor_compra_confirmar");
 
-  modelResumo.setFilter("(idVenda NOT LIKE '%CAMB%' OR idVenda IS NULL)");
-
-  modelResumo.setHeaderData("fornecedor", "Forn.");
+  modelResumo.setFilter("");
 
   ui->tableResumo->setModel(&modelResumo);
-  ui->tableResumo->hideColumn("idVenda");
+
+  //---------------------------------------------------------------------------------------
 
   modelViewCompras.setTable("view_compras");
 
-  modelViewCompras.setFilter("(Venda NOT LIKE '%CAMB%' OR Venda IS NULL)");
+  modelViewCompras.setFilter("");
 
   modelViewCompras.setHeaderData("dataPrevConf", "Prev. Conf.");
 
   ui->table->setModel(&modelViewCompras);
+
   ui->table->setItemDelegateForColumn("Total", new ReaisDelegate(this));
+
   ui->table->hideColumn("Compra");
 }
 
-bool WidgetCompraConfirmar::updateTables() {
-  if (modelViewCompras.tableName().isEmpty()) setupTables();
-
-  if (not modelResumo.select()) {
-    emit errorSignal("Erro lendo tabela resumo: " + modelResumo.lastError().text());
-    return false;
-  }
-
-  ui->tableResumo->resizeColumnsToContents();
-
-  if (not modelViewCompras.select()) {
-    emit errorSignal("Erro lendo tabela compras: " + modelViewCompras.lastError().text());
-    return false;
-  }
-
-  ui->table->resizeColumnsToContents();
-
-  return true;
+void WidgetCompraConfirmar::setConnections() {
+  connect(ui->pushButtonCancelarCompra, &QPushButton::clicked, this, &WidgetCompraConfirmar::on_pushButtonCancelarCompra_clicked);
+  connect(ui->pushButtonConfirmarCompra, &QPushButton::clicked, this, &WidgetCompraConfirmar::on_pushButtonConfirmarCompra_clicked);
 }
+
+void WidgetCompraConfirmar::updateTables() {
+  if (not isSet) {
+    setConnections();
+    isSet = true;
+  }
+
+  if (not modelIsSet) {
+    setupTables();
+    modelIsSet = true;
+  }
+
+  if (not modelResumo.select()) { return; }
+
+  if (not modelViewCompras.select()) { return; }
+}
+
+void WidgetCompraConfirmar::resetTables() { modelIsSet = false; }
 
 void WidgetCompraConfirmar::on_pushButtonConfirmarCompra_clicked() {
   // TODO: ao preencher na tabela de compras colocar o grupo como 'produto/venda'
 
   const auto list = ui->table->selectionModel()->selectedRows();
 
-  if (list.isEmpty()) {
-    emit errorSignal("Nenhum item selecionado!");
-    return;
-  }
+  if (list.isEmpty()) { return qApp->enqueueError("Nenhum item selecionado!", this); }
 
   const int row = list.first().row();
-  const QString idCompra = modelViewCompras.data(row, "Compra").toString();
 
+  const QString idCompra = modelViewCompras.data(row, "Compra").toString();
   const QString idVenda = modelViewCompras.data(row, "Venda").toString();
 
-  InputDialogFinanceiro inputDlg(InputDialogFinanceiro::Tipo::ConfirmarCompra);
+  InputDialogFinanceiro inputDlg(InputDialogFinanceiro::Tipo::ConfirmarCompra, this);
   if (not inputDlg.setFilter(idCompra)) { return; }
 
   if (inputDlg.exec() != InputDialogFinanceiro::Accepted) { return; }
@@ -88,152 +86,60 @@ void WidgetCompraConfirmar::on_pushButtonConfirmarCompra_clicked() {
   const QDateTime dataPrevista = inputDlg.getDate();
   const QDateTime dataConf = inputDlg.getNextDate();
 
-  emit transactionStarted();
+  if (not qApp->startTransaction()) { return; }
 
-  if (not QSqlQuery("SET SESSION TRANSACTION ISOLATION LEVEL SERIALIZABLE").exec()) { return; }
-  if (not QSqlQuery("START TRANSACTION").exec()) { return; }
-
-  if (not confirmarCompra(idCompra, dataPrevista, dataConf)) {
-    QSqlQuery("ROLLBACK").exec();
-    emit transactionEnded();
-    return;
-  }
+  if (not confirmarCompra(idCompra, dataPrevista, dataConf)) { return qApp->rollbackTransaction(); }
 
   if (not Sql::updateVendaStatus(idVenda)) { return; }
 
-  if (not QSqlQuery("COMMIT").exec()) { return; }
-
-  emit transactionEnded();
+  if (not qApp->endTransaction()) { return; }
 
   updateTables();
-  emit informationSignal("Compra confirmada!");
+  qApp->enqueueInformation("Compra confirmada!", this);
 }
 
 bool WidgetCompraConfirmar::confirmarCompra(const QString &idCompra, const QDateTime &dataPrevista, const QDateTime &dataConf) {
-  // REFAC: prepare querys beforehand
+  QSqlQuery querySelect;
+  querySelect.prepare("SELECT idPedido, idVendaProduto FROM pedido_fornecedor_has_produto WHERE idCompra = :idCompra AND selecionado = TRUE");
+  querySelect.bindValue(":idCompra", idCompra);
 
-  QSqlQuery query1;
-  query1.prepare("SELECT idPedido, idVendaProduto FROM pedido_fornecedor_has_produto WHERE idCompra = :idCompra AND selecionado = TRUE");
-  query1.bindValue(":idCompra", idCompra);
+  if (not querySelect.exec()) { return qApp->enqueueError(false, "Erro buscando produtos: " + querySelect.lastError().text(), this); }
 
-  if (not query1.exec()) {
-    emit errorSignal("Erro buscando produtos: " + query1.lastError().text());
-    return false;
-  }
+  QSqlQuery queryCompra;
+  queryCompra.prepare("UPDATE pedido_fornecedor_has_produto SET status = 'EM FATURAMENTO', dataRealConf = :dataRealConf, dataPrevFat = :dataPrevFat, selecionado = FALSE WHERE status = 'EM COMPRA' "
+                      "AND idPedido = :idPedido");
 
-  QSqlQuery queryUpdate1;
-  queryUpdate1.prepare("UPDATE pedido_fornecedor_has_produto SET status = 'EM FATURAMENTO', dataRealConf = :dataRealConf, dataPrevFat = :dataPrevFat, selecionado = FALSE WHERE idPedido = :idPedido");
+  QSqlQuery queryVenda;
+  queryVenda.prepare(
+      "UPDATE venda_has_produto SET status = 'EM FATURAMENTO', dataRealConf = :dataRealConf, dataPrevFat = :dataPrevFat WHERE status = 'EM COMPRA' AND idVendaProduto = :idVendaProduto");
 
-  QSqlQuery queryUpdate2;
-  queryUpdate2.prepare("UPDATE venda_has_produto SET status = 'EM FATURAMENTO', dataRealConf = :dataRealConf, dataPrevFat = :dataPrevFat WHERE idVendaProduto = :idVendaProduto");
+  while (querySelect.next()) {
+    queryCompra.bindValue(":dataRealConf", dataConf);
+    queryCompra.bindValue(":dataPrevFat", dataPrevista);
+    queryCompra.bindValue(":idPedido", querySelect.value("idPedido"));
 
-  while (query1.next()) {
-    queryUpdate1.bindValue(":dataRealConf", dataConf);
-    queryUpdate1.bindValue(":dataPrevFat", dataPrevista);
-    queryUpdate1.bindValue(":idPedido", query1.value("idPedido"));
+    if (not queryCompra.exec()) { return qApp->enqueueError(false, "Erro atualizando status da compra: " + queryCompra.lastError().text(), this); }
 
-    if (not queryUpdate1.exec()) {
-      emit errorSignal("Erro atualizando status da compra: " + queryUpdate1.lastError().text());
-      return false;
+    if (querySelect.value("idVendaProduto").toInt() != 0) {
+      queryVenda.bindValue(":dataRealConf", dataConf);
+      queryVenda.bindValue(":dataPrevFat", dataPrevista);
+      queryVenda.bindValue(":idVendaProduto", querySelect.value("idVendaProduto"));
+
+      if (not queryVenda.exec()) { return qApp->enqueueError(false, "Erro salvando status da venda: " + queryVenda.lastError().text(), this); }
     }
-
-    if (query1.value("idVendaProduto").toInt() != 0) {
-      queryUpdate2.bindValue(":dataRealConf", dataConf);
-      queryUpdate2.bindValue(":dataPrevFat", dataPrevista);
-      queryUpdate2.bindValue(":idVendaProduto", query1.value("idVendaProduto"));
-
-      if (not queryUpdate2.exec()) {
-        emit errorSignal("Erro salvando status da venda: " + queryUpdate2.lastError().text());
-        return false;
-      }
-    }
-  }
-
-  return true;
-}
-
-void WidgetCompraConfirmar::on_table_entered(const QModelIndex &) { ui->table->resizeColumnsToContents(); }
-
-bool WidgetCompraConfirmar::cancelar(const int row) {
-  QSqlQuery query1;
-  query1.prepare("SELECT idVendaProduto FROM pedido_fornecedor_has_produto WHERE ordemCompra = :ordemCompra AND status = 'EM COMPRA'");
-  query1.bindValue(":ordemCompra", modelViewCompras.data(row, "OC"));
-
-  if (not query1.exec()) {
-    emit errorSignal("Erro buscando dados: " + query1.lastError().text());
-    return false;
-  }
-
-  QSqlQuery query2;
-  query2.prepare("UPDATE venda_has_produto SET status = 'PENDENTE', idCompra = NULL WHERE idVendaProduto = :idVendaProduto AND status = 'EM COMPRA'");
-
-  while (query1.next()) {
-    query2.bindValue(":idVendaProduto", query1.value("idVendaProduto"));
-
-    if (not query2.exec()) {
-      emit errorSignal("Erro voltando status do produto: " + query2.lastError().text());
-      return false;
-    }
-  }
-
-  QSqlQuery query3;
-  query3.prepare("UPDATE pedido_fornecedor_has_produto SET status = 'CANCELADO' WHERE ordemCompra = :ordemCompra AND status = 'EM COMPRA'");
-  query3.bindValue(":ordemCompra", modelViewCompras.data(row, "OC"));
-
-  if (not query3.exec()) {
-    emit errorSignal("Erro salvando dados: " + query3.lastError().text());
-    return false;
   }
 
   return true;
 }
 
 void WidgetCompraConfirmar::on_pushButtonCancelarCompra_clicked() {
-  // TODO: 5cancelar itens individuais no lugar da compra toda?
-
   const auto list = ui->table->selectionModel()->selectedRows();
 
-  if (list.isEmpty()) {
-    emit errorSignal("Nenhum item selecionado!");
-    return;
-  }
+  if (list.isEmpty()) { return qApp->enqueueError("Nenhum item selecionado!", this); }
 
-  const int row = list.first().row();
-
-  const QString idVenda = modelViewCompras.data(row, "idVenda").toString();
-
-  QMessageBox msgBox(QMessageBox::Question, "Cancelar?", "Essa operação ira cancelar todos os itens desta OC, mesmo os já confirmados/faturados! Deseja continuar?", QMessageBox::Yes | QMessageBox::No,
-                     this);
-  msgBox.setButtonText(QMessageBox::Yes, "Cancelar");
-  msgBox.setButtonText(QMessageBox::No, "Voltar");
-
-  if (msgBox.exec() == QMessageBox::No) { return; }
-
-  emit transactionStarted();
-
-  if (not QSqlQuery("SET SESSION TRANSACTION ISOLATION LEVEL SERIALIZABLE").exec()) { return; }
-  if (not QSqlQuery("START TRANSACTION").exec()) { return; }
-
-  if (not cancelar(row)) {
-    QSqlQuery("ROLLBACK").exec();
-    emit transactionEnded();
-    return;
-  }
-
-  if (not Sql::updateVendaStatus(idVenda)) { return; }
-
-  if (not QSqlQuery("COMMIT").exec()) { return; }
-
-  emit transactionEnded();
-
-  updateTables();
-  emit informationSignal("Itens cancelados!");
-}
-
-void WidgetCompraConfirmar::on_checkBoxMostrarSul_toggled(bool checked) {
-  modelViewCompras.setFilter(checked ? "(Venda LIKE '%CAMB%')" : "(Venda NOT LIKE '%CAMB%' OR Venda IS NULL)");
-
-  if (not modelViewCompras.select()) emit errorSignal("Erro lendo tabela: " + modelViewCompras.lastError().text());
+  auto cancelaProduto = new CancelaProduto(CancelaProduto::Tipo::CompraConfirmar, this);
+  cancelaProduto->setAttribute(Qt::WA_DeleteOnClose);
+  cancelaProduto->setFilter(modelViewCompras.data(list.first().row(), "OC").toString());
 }
 
 // TODO: 1poder confirmar dois pedidos juntos (quando vem um espelho só) (cancelar os pedidos e fazer um pedido só?)

@@ -1,11 +1,9 @@
-#ifndef ESTOQUEPROXYMODEL_H
-#define ESTOQUEPROXYMODEL_H
+#pragma once
 
-#include <QIdentityProxyModel>
-
+#include "sortfilterproxymodel.h"
 #include "sqlrelationaltablemodel.h"
 
-class EstoqueProxyModel final : public QIdentityProxyModel {
+class EstoqueProxyModel final : public SortFilterProxyModel {
 
 public:
   explicit EstoqueProxyModel(SqlRelationalTableModel *model, QObject *parent = nullptr);
@@ -16,5 +14,3 @@ private:
   const int quantUpdIndex;
   enum class Status { Ok = 1, QuantDifere = 2, NaoEncontrado = 3, Consumo = 4, Devolucao = 5 };
 };
-
-#endif // ESTOQUEPROXYMODEL_H

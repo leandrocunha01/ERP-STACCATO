@@ -1,19 +1,19 @@
-#ifndef WIDGETNFE_H
-#define WIDGETNFE_H
+#pragma once
 
-#include "widget.h"
+#include <QWidget>
 
 namespace Ui {
 class WidgetNfe;
 }
 
-class WidgetNfe final : public Widget {
+class WidgetNfe final : public QWidget {
   Q_OBJECT
 
 public:
   explicit WidgetNfe(QWidget *parent = nullptr);
   ~WidgetNfe();
-  auto updateTables() -> bool;
+  auto resetTables() -> void;
+  auto updateTables() -> void;
 
 private:
   // attributes
@@ -22,5 +22,3 @@ private:
   auto setConnections() -> void;
   auto on_tabWidgetNfe_currentChanged(const int) -> void;
 };
-
-#endif // WIDGETNFE_H

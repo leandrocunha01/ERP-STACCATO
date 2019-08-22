@@ -2,6 +2,7 @@
 #include <QMessageBox>
 #include <QSqlError>
 
+#include "application.h"
 #include "cadastrofornecedor.h"
 #include "cadastroproduto.h"
 #include "ui_cadastroproduto.h"
@@ -10,14 +11,16 @@
 CadastroProduto::CadastroProduto(QWidget *parent) : RegisterDialog("produto", "idProduto", parent), ui(new Ui::CadastroProduto) {
   ui->setupUi(this);
 
-  connect(ui->doubleSpinBoxCusto, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, &CadastroProduto::on_doubleSpinBoxCusto_valueChanged);
-  connect(ui->doubleSpinBoxVenda, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, &CadastroProduto::on_doubleSpinBoxVenda_valueChanged);
+  connect(ui->doubleSpinBoxCusto, qOverload<double>(&QDoubleSpinBox::valueChanged), this, &CadastroProduto::on_doubleSpinBoxCusto_valueChanged);
+  connect(ui->doubleSpinBoxVenda, qOverload<double>(&QDoubleSpinBox::valueChanged), this, &CadastroProduto::on_doubleSpinBoxVenda_valueChanged);
   connect(ui->pushButtonAtualizar, &QPushButton::clicked, this, &CadastroProduto::on_pushButtonAtualizar_clicked);
   connect(ui->pushButtonCadastrar, &QPushButton::clicked, this, &CadastroProduto::on_pushButtonCadastrar_clicked);
   connect(ui->pushButtonNovoCad, &QPushButton::clicked, this, &CadastroProduto::on_pushButtonNovoCad_clicked);
   connect(ui->pushButtonRemover, &QPushButton::clicked, this, &CadastroProduto::on_pushButtonRemover_clicked);
 
-  Q_FOREACH (const QLineEdit *line, findChildren<QLineEdit *>()) { connect(line, &QLineEdit::textEdited, this, &RegisterDialog::marcarDirty); }
+  const auto children = findChildren<QLineEdit *>();
+
+  for (const QLineEdit *line : children) { connect(line, &QLineEdit::textEdited, this, &RegisterDialog::marcarDirty); }
 
   ui->lineEditCodBarras->setInputMask("9999999999999;_");
   ui->lineEditNCM->setInputMask("99999999;_");
@@ -31,18 +34,13 @@ CadastroProduto::CadastroProduto(QWidget *parent) : RegisterDialog("produto", "i
 
   ui->itemBoxFornecedor->setSearchDialog(SearchDialog::fornecedor(this));
 
-  sdProduto = SearchDialog::produto(true, this);
+  sdProduto = SearchDialog::produto(true, true, true, this);
   connect(sdProduto, &SearchDialog::itemSelected, this, &CadastroProduto::viewRegisterById);
   connect(ui->pushButtonBuscar, &QAbstractButton::clicked, sdProduto, &SearchDialog::show);
 
   ui->itemBoxFornecedor->setRegisterDialog(new CadastroFornecedor(this));
 
   if (UserSession::tipoUsuario() != "ADMINISTRADOR") { ui->pushButtonRemover->setDisabled(true); }
-
-  if (UserSession::tipoUsuario() == "VENDEDOR") {
-    ui->pushButtonCadastrar->setVisible(false);
-    ui->pushButtonNovoCad->setVisible(false);
-  }
 
   ui->groupBox->hide();
   ui->groupBox_4->hide();
@@ -51,18 +49,14 @@ CadastroProduto::CadastroProduto(QWidget *parent) : RegisterDialog("produto", "i
 
 CadastroProduto::~CadastroProduto() { delete ui; }
 
-bool CadastroProduto::viewRegister() {
-  if (not RegisterDialog::viewRegister()) { return false; }
-
-  // TODO: implement necessary stuff here
-
-  return true;
-}
-
 void CadastroProduto::clearFields() {
-  Q_FOREACH (const auto &line, findChildren<QLineEdit *>()) { line->clear(); }
+  const auto children = findChildren<QLineEdit *>();
 
-  Q_FOREACH (const auto &spinBox, findChildren<QDoubleSpinBox *>()) { spinBox->clear(); }
+  for (const auto &line : children) { line->clear(); }
+
+  const auto children2 = findChildren<QDoubleSpinBox *>();
+
+  for (const auto &spinBox : children2) { spinBox->clear(); }
 
   ui->itemBoxFornecedor->clear();
 
@@ -70,6 +64,8 @@ void CadastroProduto::clearFields() {
   ui->radioButtonLote->setChecked(false);
 
   ui->dateEditValidade->setDate(QDate(1900, 1, 1));
+
+  ui->textEditObserv->clear();
 }
 
 void CadastroProduto::updateMode() {
@@ -85,49 +81,39 @@ void CadastroProduto::registerMode() {
 }
 
 bool CadastroProduto::verifyFields() {
-  Q_FOREACH (const auto &line, findChildren<QLineEdit *>()) {
+  const auto children = findChildren<QLineEdit *>();
+
+  for (const auto &line : children) {
     if (not verifyRequiredField(line)) { return false; }
   }
 
   if (ui->comboBoxUn->currentText().isEmpty()) {
+    qApp->enqueueError("Faltou preencher unidade!", this);
     ui->comboBoxUn->setFocus();
-    emit errorSignal("Faltou preencher unidade!");
     return false;
   }
 
   if (ui->dateEditValidade->date().toString("dd-MM-yyyy") == "01-01-1900") {
+    qApp->enqueueError("Faltou preencher validade!", this);
     ui->dateEditValidade->setFocus();
-    emit errorSignal("Faltou preencher validade!");
     return false;
   }
 
   if (qFuzzyIsNull(ui->doubleSpinBoxCusto->value())) {
+    qApp->enqueueError("Custo inválido!", this);
     ui->doubleSpinBoxCusto->setFocus();
-    emit errorSignal("Custo inválido!");
     return false;
   }
 
   if (qFuzzyIsNull(ui->doubleSpinBoxVenda->value())) {
+    qApp->enqueueError("Preço inválido!", this);
     ui->doubleSpinBoxVenda->setFocus();
-    emit errorSignal("Preço inválido!");
     return false;
   }
 
-  if (ui->itemBoxFornecedor->getValue().isNull()) {
+  if (ui->itemBoxFornecedor->getId().isNull()) {
+    qApp->enqueueError("Faltou preencher fornecedor!", this);
     ui->itemBoxFornecedor->setFocus();
-    emit errorSignal("Faltou preencher fornecedor!");
-    return false;
-  }
-
-  if (ui->lineEditICMS->text().isEmpty()) {
-    ui->lineEditICMS->setFocus();
-    emit errorSignal("Faltou preencher ICMS!");
-    return false;
-  }
-
-  if (ui->lineEditCodComer->text().isEmpty()) {
-    ui->lineEditCodComer->setFocus();
-    emit errorSignal("Faltou preencher Código comercial!");
     return false;
   }
 
@@ -137,15 +123,9 @@ bool CadastroProduto::verifyFields() {
     query.bindValue(":fornecedor", ui->itemBoxFornecedor->text());
     query.bindValue(":codComercial", ui->lineEditCodComer->text());
 
-    if (not query.exec()) {
-      emit errorSignal("Erro verificando se produto já cadastrado!");
-      return false;
-    }
+    if (not query.exec()) { return qApp->enqueueError(false, "Erro verificando se produto já cadastrado!", this); }
 
-    if (query.first()) {
-      emit errorSignal("Código comercial já cadastrado!");
-      return false;
-    }
+    if (query.first()) { return qApp->enqueueError(false, "Código comercial já cadastrado!", this); }
   }
 
   return true;
@@ -156,18 +136,18 @@ void CadastroProduto::setupMapper() {
   addMapping(ui->comboBoxOrigem, "origem");
   addMapping(ui->comboBoxUn, "un");
   addMapping(ui->dateEditValidade, "validade");
-  addMapping(ui->doubleSpinBoxComissao, "comissao", "value");
-  addMapping(ui->doubleSpinBoxCusto, "custo", "value");
+  addMapping(ui->doubleSpinBoxComissao, "comissao");
+  addMapping(ui->doubleSpinBoxCusto, "custo");
   addMapping(ui->doubleSpinBoxEstoque, "estoqueRestante");
-  addMapping(ui->doubleSpinBoxIPI, "ipi", "value");
+  addMapping(ui->doubleSpinBoxIPI, "ipi");
   addMapping(ui->doubleSpinBoxKgCx, "kgcx");
-  addMapping(ui->doubleSpinBoxM2Cx, "m2cx", "value");
-  addMapping(ui->doubleSpinBoxMarkup, "markup", "value");
+  addMapping(ui->doubleSpinBoxM2Cx, "m2cx");
+  addMapping(ui->doubleSpinBoxMarkup, "markup");
   addMapping(ui->doubleSpinBoxPcCx, "pccx");
-  addMapping(ui->doubleSpinBoxQtePallet, "qtdPallet", "value");
-  addMapping(ui->doubleSpinBoxST, "st", "value");
-  addMapping(ui->doubleSpinBoxVenda, "precoVenda", "value");
-  addMapping(ui->itemBoxFornecedor, "idFornecedor", "value");
+  addMapping(ui->doubleSpinBoxQtePallet, "qtdPallet");
+  addMapping(ui->doubleSpinBoxST, "st");
+  addMapping(ui->doubleSpinBoxVenda, "precoVenda");
+  addMapping(ui->itemBoxFornecedor, "idFornecedor", "id");
   addMapping(ui->lineEditCodBarras, "codBarras");
   addMapping(ui->lineEditCodComer, "codComercial");
   addMapping(ui->lineEditColecao, "colecao");
@@ -183,9 +163,11 @@ void CadastroProduto::setupMapper() {
   addMapping(ui->checkBoxPromocao, "promocao");
 }
 
-void CadastroProduto::successMessage() { emit informationSignal(tipo == Tipo::Atualizar ? "Cadastro atualizado!" : "Produto cadastrado com sucesso!"); }
+void CadastroProduto::successMessage() { qApp->enqueueInformation((tipo == Tipo::Atualizar) ? "Cadastro atualizado!" : "Produto cadastrado com sucesso!", this); }
 
 bool CadastroProduto::savingProcedures() {
+  // TODO: verificar aonde estou salvando 'estoque'/'promocao' e não deixar marcar os 2
+
   if (not setData("codBarras", ui->lineEditCodBarras->text())) { return false; }
   if (not setData("codComercial", ui->lineEditCodComer->text())) { return false; }
   if (not setData("colecao", ui->lineEditColecao->text())) { return false; }
@@ -197,7 +179,7 @@ bool CadastroProduto::savingProcedures() {
   if (not setData("formComercial", ui->lineEditFormComer->text())) { return false; }
   if (not setData("Fornecedor", ui->itemBoxFornecedor->text())) { return false; }
   if (not setData("icms", ui->lineEditICMS->text())) { return false; }
-  if (not setData("idFornecedor", ui->itemBoxFornecedor->getValue())) { return false; }
+  if (not setData("idFornecedor", ui->itemBoxFornecedor->getId())) { return false; }
   if (not setData("ipi", ui->doubleSpinBoxIPI->value())) { return false; }
   if (not setData("kgcx", ui->doubleSpinBoxKgCx->value())) { return false; }
   if (not setData("m2cx", ui->doubleSpinBoxM2Cx->value())) { return false; }
@@ -216,12 +198,9 @@ bool CadastroProduto::savingProcedures() {
 
   QSqlQuery query;
   query.prepare("SELECT representacao FROM fornecedor WHERE idFornecedor = :idFornecedor");
-  query.bindValue(":idFornecedor", ui->itemBoxFornecedor->getValue());
+  query.bindValue(":idFornecedor", ui->itemBoxFornecedor->getId());
 
-  if (not query.exec() or not query.first()) {
-    emit errorSignal("Erro verificando se fornecedor é representacao: " + query.lastError().text());
-    return false;
-  }
+  if (not query.exec() or not query.first()) { return qApp->enqueueError(false, "Erro verificando se fornecedor é representacao: " + query.lastError().text(), this); }
 
   const bool representacao = query.value("representacao").toBool();
 
@@ -249,40 +228,28 @@ void CadastroProduto::calcularMarkup() {
 }
 
 bool CadastroProduto::cadastrar() {
-  currentRow = tipo == Tipo::Atualizar ? mapper.currentIndex() : model.rowCount();
+  const bool success = [&] {
+    if (tipo == Tipo::Cadastrar) { currentRow = model.insertRowAtEnd(); }
 
-  if (currentRow == -1) {
-    emit errorSignal("Erro linha -1");
-    return false;
+    if (not savingProcedures()) { return false; }
+
+    if (not columnsToUpper(model, currentRow)) { return false; }
+
+    if (not model.submitAll()) { return false; }
+
+    primaryId = (tipo == Tipo::Atualizar) ? data(currentRow, primaryKey).toString() : model.query().lastInsertId().toString();
+
+    if (primaryId.isEmpty()) { return qApp->enqueueError(false, "Id vazio!", this); }
+
+    return true;
+  }();
+
+  if (not success) {
+    qApp->rollbackTransaction();
+    void(model.select());
   }
 
-  if (tipo == Tipo::Cadastrar and not model.insertRow(currentRow)) {
-    emit errorSignal("Erro inserindo linha na tabela: " + model.lastError().text());
-    return false;
-  }
-
-  if (not savingProcedures()) { return false; }
-
-  for (int column = 0; column < model.rowCount(); ++column) {
-    const QVariant dado = model.data(currentRow, column);
-    if (dado.type() == QVariant::String) {
-      if (not model.setData(currentRow, column, dado.toString().toUpper())) { return false; }
-    }
-  }
-
-  if (not model.submitAll()) {
-    emit errorSignal("Erro salvando dados na tabela " + model.tableName() + ": " + model.lastError().text());
-    return false;
-  }
-
-  primaryId = data(currentRow, primaryKey).isValid() ? data(currentRow, primaryKey).toString() : getLastInsertId().toString();
-
-  if (primaryId.isEmpty()) {
-    emit errorSignal("Id vazio!");
-    return false;
-  }
-
-  return true;
+  return success;
 }
 
 // TODO: 3poder alterar nesta tela a quantidade minima/multiplo dos produtos
@@ -292,3 +259,4 @@ bool CadastroProduto::cadastrar() {
 // TODO: colocar logica para trabalhar a tabela produto_has_preco para que os produtos nao sejam descontinuados com validade ativa
 // TODO: validar entrada do campo icms para apenas numeros
 // REFAC: verificar para que era usado o campo 'un2' e remove-lo caso nao seja mais usado
+// TODO: verificar se vendedor deve mesmo poder alterar cadastro do produto

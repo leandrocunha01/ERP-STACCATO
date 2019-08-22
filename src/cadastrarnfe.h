@@ -1,32 +1,34 @@
-#ifndef CADASTRARNFE_H
-#define CADASTRARNFE_H
+#pragma once
 
 #include <QDataWidgetMapper>
+#include <QDialog>
 #include <QSqlQuery>
 #include <QTextStream>
 
-#include "dialog.h"
+#include "acbr.h"
 #include "sqlrelationaltablemodel.h"
 
 namespace Ui {
 class CadastrarNFe;
 }
 
-class CadastrarNFe final : public Dialog {
+class CadastrarNFe final : public QDialog {
   Q_OBJECT
 
 public:
-  explicit CadastrarNFe(const QString &idVenda, QWidget *parent = nullptr);
+  enum class Tipo { Futura, Normal, NormalAposFutura };
+  explicit CadastrarNFe(const QString &idVenda, const QList<int> &items, const Tipo tipo, QWidget *parent = nullptr);
   ~CadastrarNFe();
-  auto prepararNFe(const QList<int> &items) -> void;
 
 private:
   // attributes
+  const Tipo tipo;
   const QString idVenda;
   QDataWidgetMapper mapper;
   QSqlQuery queryCliente;
   QSqlQuery queryEndereco;
-  QSqlQuery queryIBGE;
+  QSqlQuery queryIBGEDest;
+  QSqlQuery queryIBGEEmit;
   QSqlQuery queryLojaEnd;
   QSqlQuery queryPartilhaInter;
   QSqlQuery queryPartilhaIntra;
@@ -43,7 +45,7 @@ private:
   auto calculaDigitoVerificador(QString &chave) -> bool;
   auto clearStr(const QString &str) const -> QString;
   auto criarChaveAcesso() -> bool;
-  auto gravarNota() -> QString;
+  auto gerarNota() -> QString;
   auto listarCfop() -> bool;
   auto on_comboBoxCOFINScst_currentTextChanged(const QString &text) -> void;
   auto on_comboBoxCfop_currentTextChanged(const QString &text) -> void;
@@ -76,24 +78,23 @@ private:
   auto on_pushButtonEnviarNFE_clicked() -> void;
   auto on_tabWidget_currentChanged(const int index) -> void;
   auto on_tableItens_clicked(const QModelIndex &index) -> void;
-  auto on_tableItens_entered(const QModelIndex &) -> void;
-  auto preCadastrarNota(const QString &fileName) -> std::optional<int>;
+  auto on_tableItens_dataChanged(const QModelIndex index) -> void;
+  auto preCadastrarNota() -> std::optional<int>;
   auto preencherNumeroNFe() -> bool;
-  auto processarResposta(const QString &resposta, const QString &fileName, const int &idNFe) -> bool;
+  auto prepararNFe(const QList<int> &items) -> void;
+  auto processarResposta(const QString &resposta, const QString &filePath, const int &idNFe, ACBr &acbr) -> bool;
+  auto removerNota(const int idNFe) -> void;
   auto setConnections() -> void;
   auto setupTables() -> void;
   auto unsetConnections() -> void;
   auto updateImpostos() -> void;
   auto validar() -> bool;
-  auto verificarConfiguracaoEmail() -> bool;
   auto writeDestinatario(QTextStream &stream) const -> void;
   auto writeEmitente(QTextStream &stream) const -> void;
-  auto writeIdentificacao(QTextStream &stream) const -> void;
+  auto writeIdentificacao(QTextStream &stream) -> void;
   auto writePagamento(QTextStream &stream) -> void;
   auto writeProduto(QTextStream &stream) const -> void;
   auto writeTotal(QTextStream &stream) const -> void;
   auto writeTransportadora(QTextStream &stream) const -> void;
   auto writeVolume(QTextStream &stream) const -> void;
 };
-
-#endif // CADASTRARNFE_H

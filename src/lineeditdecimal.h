@@ -1,5 +1,4 @@
-#ifndef LINEEDITDECIMAL_H
-#define LINEEDITDECIMAL_H
+#pragma once
 
 #include <QLineEdit>
 
@@ -10,12 +9,9 @@ public:
   explicit LineEditDecimal(QWidget *parent = nullptr);
   auto getValue() const -> double;
   auto setValue(const double value) -> void;
-  auto setDecimais(const int value) -> void;
 
 private:
   // attributes
   int decimais = 2;
   // methods
 };
-
-#endif // LINEEDITDECIMAL_H

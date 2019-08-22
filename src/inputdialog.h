@@ -1,14 +1,14 @@
-#ifndef INPUTDIALOG_H
-#define INPUTDIALOG_H
+#pragma once
 
-#include "dialog.h"
+#include <QDialog>
+
 #include "sqlrelationaltablemodel.h"
 
 namespace Ui {
 class InputDialog;
 }
 
-class InputDialog final : public Dialog {
+class InputDialog final : public QDialog {
   Q_OBJECT
 
 public:
@@ -28,5 +28,3 @@ private:
   auto on_dateEditEvento_dateChanged(const QDate &date) -> void;
   auto on_pushButtonSalvar_clicked() -> void;
 };
-
-#endif // INPUTDIALOG_H

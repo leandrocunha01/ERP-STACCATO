@@ -1,45 +1,48 @@
+#include <QDate>
 #include <QDebug>
 #include <QMessageBox>
 #include <QSqlError>
 #include <QSqlQuery>
 
+#include "application.h"
 #include "ui_widgetcompradevolucao.h"
 #include "widgetcompradevolucao.h"
 
-WidgetCompraDevolucao::WidgetCompraDevolucao(QWidget *parent) : Widget(parent), ui(new Ui::WidgetCompraDevolucao) {
-  ui->setupUi(this);
-
-  connect(ui->pushButtonDevolucaoFornecedor, &QPushButton::clicked, this, &WidgetCompraDevolucao::on_pushButtonDevolucaoFornecedor_clicked);
-  connect(ui->pushButtonRetornarEstoque, &QPushButton::clicked, this, &WidgetCompraDevolucao::on_pushButtonRetornarEstoque_clicked);
-  connect(ui->radioButtonFiltroPendente, &QRadioButton::toggled, this, &WidgetCompraDevolucao::on_radioButtonFiltroPendente_toggled);
-  connect(ui->table, &TableView::entered, this, &WidgetCompraDevolucao::on_table_entered);
-}
+WidgetCompraDevolucao::WidgetCompraDevolucao(QWidget *parent) : QWidget(parent), ui(new Ui::WidgetCompraDevolucao) { ui->setupUi(this); }
 
 WidgetCompraDevolucao::~WidgetCompraDevolucao() { delete ui; }
 
-bool WidgetCompraDevolucao::updateTables() {
-  if (modelVendaProduto.tableName().isEmpty()) {
+void WidgetCompraDevolucao::resetTables() { modelIsSet = false; }
+
+void WidgetCompraDevolucao::setConnections() {
+  connect(ui->pushButtonDevolucaoFornecedor, &QPushButton::clicked, this, &WidgetCompraDevolucao::on_pushButtonDevolucaoFornecedor_clicked);
+  connect(ui->pushButtonRetornarEstoque, &QPushButton::clicked, this, &WidgetCompraDevolucao::on_pushButtonRetornarEstoque_clicked);
+  connect(ui->radioButtonFiltroPendente, &QRadioButton::clicked, this, &WidgetCompraDevolucao::on_radioButtonFiltroPendente_clicked);
+  connect(ui->radioButtonFiltroDevolvido, &QRadioButton::clicked, this, &WidgetCompraDevolucao::on_radioButtonFiltroDevolvido_clicked);
+}
+
+void WidgetCompraDevolucao::updateTables() {
+  if (not isSet) {
+    setConnections();
+    isSet = true;
+  }
+
+  if (not modelIsSet) {
     setupTables();
-    ui->radioButtonFiltroPendente->setChecked(true);
+    montaFiltro();
+    modelIsSet = true;
   }
 
-  if (not modelVendaProduto.select()) {
-    emit errorSignal("Erro lendo tabela faturamento: " + modelVendaProduto.lastError().text());
-    return false;
-  }
-
-  ui->table->resizeColumnsToContents();
-
-  return true;
+  if (not modelVendaProduto.select()) { return; }
 }
 
 void WidgetCompraDevolucao::setupTables() {
-  // REFAC: refactor this to not select in here
-
   modelVendaProduto.setTable("venda_has_produto");
-  modelVendaProduto.setEditStrategy(QSqlTableModel::OnManualSubmit);
+
+  modelVendaProduto.setSort("idVenda", Qt::AscendingOrder);
 
   modelVendaProduto.setHeaderData("status", "Status");
+  modelVendaProduto.setHeaderData("statusOriginal", "Status Original");
   modelVendaProduto.setHeaderData("fornecedor", "Fornecedor");
   modelVendaProduto.setHeaderData("idVenda", "Venda");
   modelVendaProduto.setHeaderData("produto", "Produto");
@@ -51,19 +54,16 @@ void WidgetCompraDevolucao::setupTables() {
   modelVendaProduto.setHeaderData("codComercial", "Cód. Com.");
   modelVendaProduto.setHeaderData("formComercial", "Form. Com.");
 
-  modelVendaProduto.setFilter("0");
-
-  if (not modelVendaProduto.select()) emit errorSignal("Erro lendo tabela produtos pendentes: " + modelVendaProduto.lastError().text());
-
   ui->table->setModel(&modelVendaProduto);
 
-  ui->table->sortByColumn("idVenda");
+  ui->table->hideColumn("idRelacionado");
   ui->table->hideColumn("recebeu");
   ui->table->hideColumn("entregou");
   ui->table->hideColumn("selecionado");
   ui->table->hideColumn("idVendaProduto");
   ui->table->hideColumn("idCompra");
   ui->table->hideColumn("idNFeSaida");
+  ui->table->hideColumn("idNFeFutura");
   ui->table->hideColumn("idLoja");
   ui->table->hideColumn("idProduto");
   ui->table->hideColumn("prcUnitario");
@@ -73,7 +73,8 @@ void WidgetCompraDevolucao::setupTables() {
   ui->table->hideColumn("parcialDesc");
   ui->table->hideColumn("descGlobal");
   ui->table->hideColumn("total");
-  ui->table->hideColumn("reposicao");
+  ui->table->hideColumn("reposicaoEntrega");
+  ui->table->hideColumn("reposicaoReceb");
   ui->table->hideColumn("estoque");
   ui->table->hideColumn("promocao");
   ui->table->hideColumn("mostrarDesconto");
@@ -89,7 +90,6 @@ void WidgetCompraDevolucao::setupTables() {
   ui->table->hideColumn("dataRealReceb");
   ui->table->hideColumn("dataPrevEnt");
   ui->table->hideColumn("dataRealEnt");
-  ui->table->resizeColumnsToContents();
 }
 
 void WidgetCompraDevolucao::on_pushButtonDevolucaoFornecedor_clicked() {
@@ -99,24 +99,15 @@ void WidgetCompraDevolucao::on_pushButtonDevolucaoFornecedor_clicked() {
 
   const auto list = ui->table->selectionModel()->selectedRows();
 
-  if (list.isEmpty()) {
-    emit errorSignal("Não selecionou nenhuma linha!");
-    return;
-  }
+  if (list.isEmpty()) { return qApp->enqueueError("Não selecionou nenhuma linha!", this); }
 
   for (const auto &item : list) {
-    if (not modelVendaProduto.setData(item.row(), "status", "DEVOLVIDO FORN.")) {
-      emit errorSignal("Erro marcando status: " + modelVendaProduto.lastError().text());
-      return;
-    }
+    if (not modelVendaProduto.setData(item.row(), "status", "DEVOLVIDO FORN.")) { return; }
   }
 
-  if (not modelVendaProduto.submitAll()) {
-    emit errorSignal("Erro salvando status processado: " + modelVendaProduto.lastError().text());
-    return;
-  }
+  if (not modelVendaProduto.submitAll()) { return; }
 
-  emit informationSignal("Retornado para fornecedor!");
+  qApp->enqueueInformation("Retornado para fornecedor!", this);
 }
 
 bool WidgetCompraDevolucao::retornarEstoque(const QModelIndexList &list) {
@@ -128,7 +119,7 @@ bool WidgetCompraDevolucao::retornarEstoque(const QModelIndexList &list) {
   query.prepare("SELECT idVendaProduto FROM venda_has_produto WHERE idVenda = :idVenda AND idProduto = :idProduto");
 
   for (const auto &item : list) {
-    const QString status = modelVendaProduto.data(item.row(), "status").toString();
+    const QString status = modelVendaProduto.data(item.row(), "statusOriginal").toString();
 
     if (not modelVendaProduto.setData(item.row(), "status", "DEVOLVIDO ESTOQUE")) { return false; }
 
@@ -151,10 +142,7 @@ bool WidgetCompraDevolucao::retornarEstoque(const QModelIndexList &list) {
       query.bindValue(":idVenda", modelVendaProduto.data(item.row(), "idVenda").toString().left(11));
       query.bindValue(":idProduto", modelVendaProduto.data(item.row(), "idProduto"));
 
-      if (not query.exec() or not query.first()) {
-        emit errorSignal("Erro buscando idVendaProduto: " + query.lastError().text());
-        return false;
-      }
+      if (not query.exec() or not query.first()) { return qApp->enqueueError(false, "Erro buscando idVendaProduto: " + query.lastError().text(), this); }
 
       const QString idVendaProduto = query.value("idVendaProduto").toString();
 
@@ -162,18 +150,11 @@ bool WidgetCompraDevolucao::retornarEstoque(const QModelIndexList &list) {
       modelConsumo.setTable("estoque_has_consumo");
       modelConsumo.setFilter("idVendaProduto = " + idVendaProduto);
 
-      if (not modelConsumo.select()) {
-        emit errorSignal("Erro buscando consumo estoque: " + modelConsumo.lastError().text());
-        return false;
-      }
+      if (not modelConsumo.select()) { return false; }
 
-      if (modelConsumo.rowCount() == 0) {
-        emit errorSignal("Não encontrou estoque!");
-        return false;
-      }
+      if (modelConsumo.rowCount() == 0) { return qApp->enqueueError(false, "Não encontrou estoque!", this); }
 
-      const int newRow = modelConsumo.rowCount();
-      modelConsumo.insertRow(newRow);
+      const int newRow = modelConsumo.insertRowAtEnd();
 
       for (int column = 0; column < modelConsumo.columnCount(); ++column) {
         if (modelConsumo.fieldIndex("idConsumo") == column) { continue; }
@@ -181,10 +162,9 @@ bool WidgetCompraDevolucao::retornarEstoque(const QModelIndexList &list) {
         if (modelConsumo.fieldIndex("created") == column) { continue; }
         if (modelConsumo.fieldIndex("lastUpdated") == column) { continue; }
 
-        if (not modelConsumo.setData(newRow, column, modelConsumo.data(0, column))) {
-          emit errorSignal("Erro copiando dados do consumo: " + modelConsumo.lastError().text());
-          return false;
-        }
+        const QVariant value = modelConsumo.data(0, column);
+
+        if (not modelConsumo.setData(newRow, column, value)) { return false; }
       }
 
       // TODO: update other fields
@@ -194,56 +174,38 @@ bool WidgetCompraDevolucao::retornarEstoque(const QModelIndexList &list) {
       if (not modelConsumo.setData(newRow, "quant", modelVendaProduto.data(item.row(), "quant").toDouble() * -1)) { return false; }
       if (not modelConsumo.setData(newRow, "quantUpd", 5)) { return false; }
 
-      if (not modelConsumo.submitAll()) {
-        emit errorSignal("Erro salvando devolução de estoque: " + modelConsumo.lastError().text());
-        return false;
-      }
+      if (not modelConsumo.submitAll()) { return false; }
     }
   }
 
-  if (not modelVendaProduto.submitAll()) {
-    emit errorSignal("Erro salvando status processado: " + modelVendaProduto.lastError().text());
-    return false;
-  }
-
-  return true;
+  return modelVendaProduto.submitAll();
 }
 
 void WidgetCompraDevolucao::on_pushButtonRetornarEstoque_clicked() {
   const auto list = ui->table->selectionModel()->selectedRows();
 
-  if (list.isEmpty()) {
-    emit errorSignal("Não selecionou nenhuma linha!");
-    return;
-  }
+  if (list.isEmpty()) { return qApp->enqueueError("Não selecionou nenhuma linha!", this); }
 
-  emit transactionStarted();
+  if (not qApp->startTransaction()) { return; }
 
-  if (not QSqlQuery("SET SESSION TRANSACTION ISOLATION LEVEL SERIALIZABLE").exec()) { return; }
-  if (not QSqlQuery("START TRANSACTION").exec()) { return; }
+  if (not retornarEstoque(list)) { return qApp->rollbackTransaction(); }
 
-  if (not retornarEstoque(list)) {
-    QSqlQuery("ROLLBACK").exec();
-    emit transactionEnded();
-    return;
-  }
+  if (not qApp->endTransaction()) { return; }
 
-  if (not QSqlQuery("COMMIT").exec()) { return; }
+  if (not modelVendaProduto.select()) { return; }
 
-  emit transactionEnded();
-
-  if (not modelVendaProduto.select()) emit errorSignal("Erro lendo tabela: " + modelVendaProduto.lastError().text());
-
-  emit informationSignal("Retornado para estoque!");
+  qApp->enqueueInformation("Retornado para estoque!", this);
 }
 
-void WidgetCompraDevolucao::on_radioButtonFiltroPendente_toggled(bool checked) {
-  ui->pushButtonDevolucaoFornecedor->setEnabled(checked);
-  ui->pushButtonRetornarEstoque->setEnabled(checked);
+void WidgetCompraDevolucao::on_radioButtonFiltroPendente_clicked(const bool) { montaFiltro(); }
 
-  modelVendaProduto.setFilter("quant < 0 AND " + QString(checked ? "status != 'DEVOLVIDO ESTOQUE' AND status != 'DEVOLVIDO FORN.'" : "(status = 'DEVOLVIDO ESTOQUE' OR status = 'DEVOLVIDO FORN.')"));
+void WidgetCompraDevolucao::on_radioButtonFiltroDevolvido_clicked(const bool) { montaFiltro(); }
 
-  if (not modelVendaProduto.select()) emit errorSignal("Erro lendo tabela: " + modelVendaProduto.lastError().text());
+void WidgetCompraDevolucao::montaFiltro() {
+  const bool isPendente = ui->radioButtonFiltroPendente->isChecked();
+
+  ui->pushButtonDevolucaoFornecedor->setEnabled(isPendente);
+  ui->pushButtonRetornarEstoque->setEnabled(isPendente);
+
+  modelVendaProduto.setFilter("quant < 0 AND " + QString(isPendente ? "status = 'PENDENTE DEV.'" : "status != 'PENDENTE DEV.'"));
 }
-
-void WidgetCompraDevolucao::on_table_entered(const QModelIndex &) { ui->table->resizeColumnsToContents(); }

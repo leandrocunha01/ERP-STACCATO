@@ -4,7 +4,9 @@
 #include <QIcon>
 #include <QInputDialog>
 #include <QMessageBox>
+#include <QSqlDriver>
 #include <QSqlError>
+#include <QStyle>
 #include <QTimer>
 
 #include "application.h"
@@ -15,7 +17,7 @@ Application::Application(int &argc, char **argv, int) : QApplication(argc, argv)
   setOrganizationName("Staccato");
   setApplicationName("ERP");
   setWindowIcon(QIcon("Staccato.ico"));
-  setApplicationVersion("0.6.12");
+  setApplicationVersion(APP_VERSION);
   setStyle("Fusion");
 
   readSettingsFile();
@@ -25,115 +27,130 @@ Application::Application(int &argc, char **argv, int) : QApplication(argc, argv)
   if (const auto tema = UserSession::getSetting("User/tema"); tema and tema.value().toString() == "escuro") { darkTheme(); }
 }
 
+void Application::enqueueError(const QString &error, QWidget *parent) {
+  errorQueue << Message{error, parent};
+
+  if (not updating) { showMessages(); }
+}
+
+bool Application::enqueueError(const bool boolean, const QString &error, QWidget *parent) {
+  enqueueError(error, parent);
+  return boolean;
+}
+
+void Application::enqueueInformation(const QString &information, QWidget *parent) {
+  informationQueue << Message{information, parent};
+
+  if (not updating) { showMessages(); }
+}
+
+void Application::enqueueWarning(const QString &warning, QWidget *parent) {
+  warningQueue << Message{warning, parent};
+
+  if (not updating) { showMessages(); }
+}
+
 void Application::readSettingsFile() {
   QFile file("lojas.txt");
 
-  if (not file.open(QFile::ReadOnly)) {
-    QMessageBox::critical(nullptr, "Erro!", "Erro lendo configurações: " + file.errorString());
-    return;
-  }
+  if (not file.open(QFile::ReadOnly)) { return qApp->enqueueError("Erro lendo configurações: " + file.errorString()); }
 
   const QStringList lines = QString(file.readAll()).split("\r\n", QString::SkipEmptyParts);
 
   for (int i = 0; i < lines.size(); i += 2) { mapLojas.insert(lines.at(i), lines.at(i + 1)); }
 }
 
-bool Application::dbConnect() {
+bool Application::setDatabase() {
   if (not QSqlDatabase::drivers().contains("QMYSQL")) {
-    QMessageBox::critical(nullptr, "Não foi possível carregar o banco de dados.", "Este aplicativo requer o driver QMYSQL.");
+    qApp->enqueueError("Este aplicativo requer o driver QMYSQL.");
     exit(1);
   }
 
-  QSqlDatabase db = QSqlDatabase::contains() ? QSqlDatabase::database() : QSqlDatabase::addDatabase("QMYSQL");
-
-  if (db.isOpen()) { return true; }
-
   const auto hostname = UserSession::getSetting("Login/hostname");
 
-  if (not hostname) {
-    QMessageBox::critical(nullptr, "Erro!", "A chave 'hostname' não está configurada!");
-    return false;
-  }
+  if (not hostname) { return qApp->enqueueError(false, "A chave 'hostname' não está configurada!"); }
 
   const auto lastuser = UserSession::getSetting("User/lastuser");
 
   if (not lastuser) { return false; }
 
+  if (not QSqlDatabase::contains()) { db = QSqlDatabase::addDatabase("QMYSQL"); }
+
+  QFile file("mysql.txt");
+
+  if (not file.open(QFile::ReadOnly)) { return qApp->enqueueError(false, "Erro lendo mysql.txt: " + file.errorString()); }
+
+  const QString password = file.readAll();
+
   db.setHostName(hostname.value().toString());
   db.setUserName(lastuser.value().toString().toLower());
-  db.setPassword("12345");
+  db.setPassword(password);
   db.setDatabaseName("mydb");
   db.setPort(3306);
 
   db.setConnectOptions("CLIENT_COMPRESS=1");
+  //  db.setConnectOptions("CLIENT_COMPRESS=1;MYSQL_OPT_READ_TIMEOUT=10;MYSQL_OPT_WRITE_TIMEOUT=10;MYSQL_OPT_CONNECT_TIMEOUT=10");
 
-  QSqlQuery query;
+  return true;
+}
+
+bool Application::dbReconnect(const bool silent) {
+  db.close();
+
+  isConnected = db.open();
+
+  if (not isConnected) { return (silent) ? false : qApp->enqueueError(false, "Erro conectando no banco de dados: " + db.lastError().text()); }
+
+  return db.isOpen();
+}
+
+bool Application::dbConnect() {
+  if (not setDatabase()) { return false; }
 
   if (not db.open()) {
     // TODO: caso o servidor selecionado nao esteja disponivel tente os outros
     // TODO: try local ip's first
 
-    //    db.setHostName("201.6.117.16");
-    //    UserSession::setSetting("Login/hostname", "201.6.117.16");
-
-    //    if (not db.open()) {
-    //      db.setHostName("187.122.102.193");
-    //      UserSession::setSetting("Login/hostname", "187.122.102.193");
-
-    //      if (not db.open()) {
-    //        QMessageBox::critical(nullptr, "Erro", "Erro conectando no banco de dados: " + db.lastError().text());
-    //        isConnected = false;
-    //        return false;
-    //      }
-    //    }
-
-    //      //    QMessageBox::critical(nullptr, "Erro", "Erro conectando no banco de dados: " + db.lastError().text());
-    //      //    return false;
-    //    }
-
-    QMessageBox::critical(nullptr, "Erro", "Erro conectando no banco de dados: " + db.lastError().text());
-
     isConnected = false;
 
-    return false;
+    return qApp->enqueueError(false, "Erro conectando no banco de dados: " + db.lastError().text());
   }
 
   isConnected = true;
 
-  if (not query.exec("SELECT lastInvalidated FROM maintenance") or not query.first()) {
-    QMessageBox::critical(nullptr, "Erro", "Erro verificando lastInvalidated: " + query.lastError().text());
-    return false;
-  }
+  if (not runSqlJobs()) { return false; }
+
+  startSqlPing();
+  // startUpdaterPing();
+
+  return true;
+}
+
+bool Application::runSqlJobs() {
+  QSqlQuery query;
+
+  if (not query.exec("SELECT lastInvalidated FROM maintenance") or not query.first()) { return qApp->enqueueError(false, "Erro verificando lastInvalidated: " + query.lastError().text()); }
 
   if (query.value("lastInvalidated").toDate() < QDate::currentDate()) {
-    if (not query.exec("CALL invalidar_produtos_expirados()")) {
-      QMessageBox::critical(nullptr, "Erro!", "Erro executando InvalidarExpirados: " + query.lastError().text());
-      return false;
-    }
+    if (not query.exec("CALL invalidar_produtos_expirados()")) { return qApp->enqueueError(false, "Erro executando InvalidarExpirados: " + query.lastError().text()); }
 
-    if (not query.exec("CALL invalidar_orcamentos_expirados()")) {
-      QMessageBox::critical(nullptr, "Erro!", "Erro executando update_orcamento_status: " + query.lastError().text());
-      return false;
-    }
+    if (not query.exec("CALL invalidar_orcamentos_expirados()")) { return qApp->enqueueError(false, "Erro executando update_orcamento_status: " + query.lastError().text()); }
 
     query.prepare("UPDATE maintenance SET lastInvalidated = :lastInvalidated WHERE id = 1");
     query.bindValue(":lastInvalidated", QDate::currentDate().toString("yyyy-MM-dd"));
 
-    if (not query.exec()) {
-      QMessageBox::critical(nullptr, "Erro", "Erro atualizando lastInvalidated: " + query.lastError().text());
-      return false;
-    }
+    if (not query.exec()) { return qApp->enqueueError(false, "Erro atualizando lastInvalidated: " + query.lastError().text()); }
   }
-
-  startSqlPing();
 
   return true;
 }
 
 void Application::startSqlPing() {
   auto *timer = new QTimer(this);
-  connect(timer, &QTimer::timeout, this, [] { QSqlQuery("DO 0").exec(); });
+  connect(timer, &QTimer::timeout, this, [] { QSqlQuery().exec("DO 0"); });
   timer->start(60000);
+
+  // TODO: se ping falhar marcar 'desconectado'?
 
   // TODO: futuramente verificar se tem atualizacao no servidor e avisar usuario
 }
@@ -153,11 +170,11 @@ void Application::darkTheme() {
   darkPalette.setColor(QPalette::ButtonText, Qt::white);
   darkPalette.setColor(QPalette::BrightText, Qt::red);
   darkPalette.setColor(QPalette::Link, QColor(42, 130, 218));
-  darkPalette.setColor(QPalette::Disabled, QPalette::ButtonText, QColor(120, 120, 120));
 
   darkPalette.setColor(QPalette::Highlight, QColor(42, 130, 218));
   darkPalette.setColor(QPalette::HighlightedText, Qt::black);
 
+  darkPalette.setColor(QPalette::Disabled, QPalette::ButtonText, QColor(120, 120, 120));
   darkPalette.setColor(QPalette::Disabled, QPalette::Base, QColor(120, 120, 120));
   darkPalette.setColor(QPalette::Disabled, QPalette::WindowText, QColor(120, 120, 120));
 
@@ -171,37 +188,45 @@ void Application::darkTheme() {
 void Application::lightTheme() {
   qApp->setStyle("Fusion");
   qApp->setPalette(defaultPalette);
-  qApp->setStyleSheet(styleSheet());
+  qApp->setStyleSheet("QToolTip { color: #ffffff; background-color: #2a82da; border: 1px solid white; }");
 
   UserSession::setSetting("User/tema", "claro");
 }
 
-void Application::endTransaction() {
+bool Application::startTransaction(const bool delayMessages) {
+  if (inTransaction) { return qApp->enqueueError(false, "Transação já em execução!"); }
+
+  if (QSqlQuery query; not query.exec("START TRANSACTION")) { return qApp->enqueueError(false, "Erro iniciando transaction: " + query.lastError().text()); }
+
+  inTransaction = true;
+  this->delayMessages = delayMessages;
+
+  return true;
+}
+
+bool Application::endTransaction() {
+  if (not inTransaction) { return qApp->enqueueError(false, "Não está em transação"); }
+
+  if (QSqlQuery query; not query.exec("COMMIT")) { return qApp->enqueueError(false, "Erro no commit: " + query.lastError().text()); }
+
   inTransaction = false;
+  delayMessages = false;
+
+  showMessages();
+
+  return true;
+}
+
+void Application::rollbackTransaction() {
+  if (not inTransaction) { return qApp->enqueueError("Não está em transação!"); }
+
+  if (QSqlQuery query; not query.exec("ROLLBACK")) { return qApp->enqueueError("Erro rollback: " + query.lastError().text()); }
+
+  inTransaction = false;
+  delayMessages = false;
 
   showMessages();
 }
-
-void Application::enqueueWarning(const QString &warning) {
-  warningQueue << warning;
-
-  if (not updating) { showMessages(); }
-}
-
-void Application::enqueueInformation(const QString &information) {
-  informationQueue << information;
-
-  if (not updating) { showMessages(); }
-}
-
-void Application::enqueueError(const QString &error) {
-  errorQueue << error;
-
-  if (not updating) { showMessages(); }
-}
-
-// TODO: if inTransaction is true give a error message and abort (to avoid nested transactions)
-void Application::startTransaction() { inTransaction = true; }
 
 bool Application::getShowingErrors() const { return showingErrors; }
 
@@ -228,22 +253,40 @@ void Application::setInTransaction(const bool value) { inTransaction = value; }
 void Application::setUpdating(const bool value) {
   updating = value;
 
-  if (value == false) { showMessages(); }
+  if (not updating) { showMessages(); }
 }
 
 bool Application::getUpdating() const { return updating; }
 
 void Application::showMessages() {
-  if (inTransaction or updating) { return; }
+  if (delayMessages and (inTransaction or updating)) { return; }
   if (errorQueue.isEmpty() and warningQueue.isEmpty() and informationQueue.isEmpty()) { return; }
 
   showingErrors = true;
 
-  // TODO: deal with 'Lost connection to MySQL server'
+  for (const auto &error : std::as_const(errorQueue)) {
+    const QString error1 = "MySQL server has gone away";
+    const QString error2 = "Lost connection to MySQL server during query";
 
-  for (const auto &error : std::as_const(errorQueue)) { QMessageBox::critical(nullptr, "Erro!", error); }
-  for (const auto &warning : std::as_const(warningQueue)) { QMessageBox::warning(nullptr, "Aviso!", warning); }
-  for (const auto &information : std::as_const(informationQueue)) { QMessageBox::information(nullptr, "Informação!", information); }
+    const QString message = error.message;
+
+    if (message.contains(error1) or message.contains(error2)) {
+      const bool conectado = qApp->dbReconnect(true);
+
+      emit verifyDb(conectado);
+
+      if (conectado) {
+        continue;
+      } else {
+        QMessageBox::critical(error.widget, "Erro!", "Conexão com o servidor perdida!");
+      }
+    }
+
+    QMessageBox::critical(error.widget, "Erro!", error.message);
+  }
+
+  for (const auto &warning : std::as_const(warningQueue)) { QMessageBox::warning(warning.widget, "Aviso!", warning.message); }
+  for (const auto &information : std::as_const(informationQueue)) { QMessageBox::information(information.widget, "Informação!", information.message); }
 
   errorQueue.clear();
   warningQueue.clear();
@@ -257,7 +300,7 @@ void Application::updater() {
 
   if (not hostname) { return; }
 
-  auto *updater = new QSimpleUpdater();
+  auto *updater = new QSimpleUpdater(this);
   updater->setApplicationVersion(qApp->applicationVersion());
   updater->setReferenceUrl("http://" + hostname.value().toString() + "/versao.txt");
   updater->setDownloadUrl("http://" + hostname.value().toString() + "/Instalador.exe");

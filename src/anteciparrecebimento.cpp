@@ -3,11 +3,12 @@
 #include <QSqlQuery>
 
 #include "anteciparrecebimento.h"
+#include "application.h"
 #include "doubledelegate.h"
 #include "reaisdelegate.h"
 #include "ui_anteciparrecebimento.h"
 
-AnteciparRecebimento::AnteciparRecebimento(QWidget *parent) : Dialog(parent), ui(new Ui::AnteciparRecebimento) {
+AnteciparRecebimento::AnteciparRecebimento(QWidget *parent) : QDialog(parent), ui(new Ui::AnteciparRecebimento) {
   ui->setupUi(this);
 
   setWindowFlags(Qt::Window);
@@ -15,7 +16,7 @@ AnteciparRecebimento::AnteciparRecebimento(QWidget *parent) : Dialog(parent), ui
   setupTables();
 
   ui->itemBoxConta->setSearchDialog(SearchDialog::conta(this));
-  ui->itemBoxConta->setValue(3);
+  ui->itemBoxConta->setId(3);
 
   ui->comboBox->clear();
   ui->comboBox->addItem("");
@@ -28,7 +29,7 @@ AnteciparRecebimento::AnteciparRecebimento(QWidget *parent) : Dialog(parent), ui
 
   QSqlQuery query;
 
-  if (not query.exec("SELECT DISTINCT pagamento AS tipo FROM view_pagamento_loja")) { emit errorSignal("Erro comunicando com banco de dados: " + query.lastError().text()); }
+  if (not query.exec("SELECT DISTINCT pagamento AS tipo FROM view_pagamento_loja")) { qApp->enqueueError("Erro comunicando com banco de dados: " + query.lastError().text(), this); }
 
   while (query.next()) { ui->comboBox->addItem(query.value("tipo").toString()); }
 
@@ -40,15 +41,16 @@ AnteciparRecebimento::AnteciparRecebimento(QWidget *parent) : Dialog(parent), ui
 AnteciparRecebimento::~AnteciparRecebimento() { delete ui; }
 
 void AnteciparRecebimento::setConnections() {
-  connect(ui->checkBoxIOF, &QCheckBox::clicked, this, &AnteciparRecebimento::calcularTotais);
-  connect(ui->comboBox, &QComboBox::currentTextChanged, this, &AnteciparRecebimento::on_comboBox_currentTextChanged);
-  connect(ui->comboBoxLoja, &QComboBox::currentTextChanged, this, &AnteciparRecebimento::on_comboBox_currentTextChanged);
-  connect(ui->dateEditEvento, &QDateEdit::dateChanged, this, &AnteciparRecebimento::calcularTotais);
-  connect(ui->doubleSpinBoxDescMes, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, &AnteciparRecebimento::calcularTotais);
-  connect(ui->doubleSpinBoxValorPresente, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, &AnteciparRecebimento::on_doubleSpinBoxValorPresente_valueChanged);
-  connect(ui->pushButtonGerar, &QPushButton::clicked, this, &AnteciparRecebimento::on_pushButtonGerar_clicked);
-  connect(ui->table, &TableView::entered, this, &AnteciparRecebimento::on_table_entered);
-  connect(ui->table->selectionModel(), &QItemSelectionModel::selectionChanged, this, &AnteciparRecebimento::calcularTotais);
+  const auto connectionType = static_cast<Qt::ConnectionType>(Qt::AutoConnection | Qt::UniqueConnection);
+
+  connect(ui->checkBoxIOF, &QCheckBox::clicked, this, &AnteciparRecebimento::calcularTotais, connectionType);
+  connect(ui->comboBox, &QComboBox::currentTextChanged, this, &AnteciparRecebimento::on_comboBox_currentTextChanged, connectionType);
+  connect(ui->comboBoxLoja, &QComboBox::currentTextChanged, this, &AnteciparRecebimento::on_comboBox_currentTextChanged, connectionType);
+  connect(ui->dateEditEvento, &QDateEdit::dateChanged, this, &AnteciparRecebimento::calcularTotais, connectionType);
+  connect(ui->doubleSpinBoxDescMes, qOverload<double>(&QDoubleSpinBox::valueChanged), this, &AnteciparRecebimento::calcularTotais, connectionType);
+  connect(ui->doubleSpinBoxValorPresente, qOverload<double>(&QDoubleSpinBox::valueChanged), this, &AnteciparRecebimento::on_doubleSpinBoxValorPresente_valueChanged, connectionType);
+  connect(ui->pushButtonGerar, &QPushButton::clicked, this, &AnteciparRecebimento::on_pushButtonGerar_clicked, connectionType);
+  connect(ui->table->selectionModel(), &QItemSelectionModel::selectionChanged, this, &AnteciparRecebimento::calcularTotais, connectionType);
 }
 
 void AnteciparRecebimento::unsetConnections() {
@@ -56,10 +58,9 @@ void AnteciparRecebimento::unsetConnections() {
   disconnect(ui->comboBox, &QComboBox::currentTextChanged, this, &AnteciparRecebimento::on_comboBox_currentTextChanged);
   disconnect(ui->comboBoxLoja, &QComboBox::currentTextChanged, this, &AnteciparRecebimento::on_comboBox_currentTextChanged);
   disconnect(ui->dateEditEvento, &QDateEdit::dateChanged, this, &AnteciparRecebimento::calcularTotais);
-  disconnect(ui->doubleSpinBoxDescMes, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, &AnteciparRecebimento::calcularTotais);
-  disconnect(ui->doubleSpinBoxValorPresente, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, &AnteciparRecebimento::on_doubleSpinBoxValorPresente_valueChanged);
+  disconnect(ui->doubleSpinBoxDescMes, qOverload<double>(&QDoubleSpinBox::valueChanged), this, &AnteciparRecebimento::calcularTotais);
+  disconnect(ui->doubleSpinBoxValorPresente, qOverload<double>(&QDoubleSpinBox::valueChanged), this, &AnteciparRecebimento::on_doubleSpinBoxValorPresente_valueChanged);
   disconnect(ui->pushButtonGerar, &QPushButton::clicked, this, &AnteciparRecebimento::on_pushButtonGerar_clicked);
-  disconnect(ui->table, &TableView::entered, this, &AnteciparRecebimento::on_table_entered);
   disconnect(ui->table->selectionModel(), &QItemSelectionModel::selectionChanged, this, &AnteciparRecebimento::calcularTotais);
 }
 
@@ -105,7 +106,6 @@ void AnteciparRecebimento::calcularTotais() {
 
 void AnteciparRecebimento::setupTables() {
   modelContaReceber.setTable("conta_a_receber_has_pagamento");
-  modelContaReceber.setEditStrategy(QSqlTableModel::OnManualSubmit);
 
   modelContaReceber.setHeaderData("dataEmissao", "Data Emissão");
   modelContaReceber.setHeaderData("idVenda", "Código");
@@ -128,14 +128,12 @@ void AnteciparRecebimento::setupTables() {
   modelContaReceber.setHeaderData("contraParte", "Contraparte");
   modelContaReceber.setHeaderData("statusFinanceiro", "Financeiro");
 
-  modelContaReceber.setFilter("(status = 'PENDENTE' OR status = 'CONFERIDO') AND representacao = FALSE AND dataPagamento > NOW()");
+  modelContaReceber.setFilter("status IN ('PENDENTE', 'CONFERIDO') AND representacao = FALSE ORDER BY dataPagamento");
 
-  if (not modelContaReceber.select()) {
-    emit errorSignal("Erro lendo tabela: " + modelContaReceber.lastError().text());
-    return;
-  }
+  if (not modelContaReceber.select()) { return; }
 
   ui->table->setModel(&modelContaReceber);
+
   ui->table->hideColumn("representacao");
   ui->table->hideColumn("idPagamento");
   ui->table->hideColumn("idLoja");
@@ -153,25 +151,26 @@ void AnteciparRecebimento::setupTables() {
   ui->table->hideColumn("desativado");
 
   ui->table->setItemDelegate(new DoubleDelegate(this));
+
   ui->table->setItemDelegateForColumn("valor", new ReaisDelegate(this));
 }
 
-void AnteciparRecebimento::on_table_entered(const QModelIndex) { ui->table->resizeColumnsToContents(); }
+void AnteciparRecebimento::montaFiltro() {
+  const QString textTipo = ui->comboBox->currentText();
+  const QString textLoja = ui->comboBoxLoja->currentText();
 
-void AnteciparRecebimento::on_comboBox_currentTextChanged(const QString &text) {
-  modelContaReceber.setFilter("tipo LIKE '%" + ui->comboBox->currentText() + "%' AND idVenda LIKE '" + ui->comboBoxLoja->currentText() +
-                              "%' AND (status = 'PENDENTE' or status = 'CONFERIDO') AND representacao = FALSE AND desativado = FALSE and dataPagamento > NOW()");
-
-  if (text == "Cartão de crédito" or ui->comboBox->currentText() == "Cartão de débito") {
-    modelContaReceber.setFilter("(tipo LIKE '%Cartão de crédito%' OR tipo LIKE '%Cartão de débito%' OR tipo LIKE '%Taxa Cartão%') AND representacao = FALSE AND idVenda LIKE '" +
-                                ui->comboBoxLoja->currentText() + "%' AND (status = 'PENDENTE' OR status = 'CONFERIDO') AND desativado = FALSE and dataPagamento > NOW()");
-  }
-
-  if (not modelContaReceber.select()) {
-    emit errorSignal("Erro lendo tabela: " + modelContaReceber.lastError().text());
-    return;
+  if (textTipo == "Cartão de crédito" or textTipo == "Cartão de débito") {
+    modelContaReceber.setFilter("(tipo LIKE '%Cartão de crédito%' OR tipo LIKE '%Cartão de débito%' OR tipo LIKE '%Taxa Cartão%') AND representacao = FALSE AND idVenda LIKE '" + textLoja +
+                                "%' AND status IN ('PENDENTE', 'CONFERIDO') AND desativado = FALSE ORDER BY dataPagamento");
+  } else {
+    modelContaReceber.setFilter("tipo LIKE '%" + textTipo + "%' AND idVenda LIKE '" + textLoja +
+                                "%' AND status IN ('PENDENTE', 'CONFERIDO') AND representacao = FALSE AND desativado = FALSE ORDER BY dataPagamento");
   }
 }
+
+void AnteciparRecebimento::on_comboBoxLoja_currentTextChanged(const QString &) { montaFiltro(); }
+
+void AnteciparRecebimento::on_comboBox_currentTextChanged(const QString &) { montaFiltro(); }
 
 void AnteciparRecebimento::on_doubleSpinBoxValorPresente_valueChanged(double) {
   const double presente = ui->doubleSpinBoxValorPresente->value();
@@ -192,50 +191,38 @@ void AnteciparRecebimento::on_doubleSpinBoxValorPresente_valueChanged(double) {
 
 bool AnteciparRecebimento::cadastrar(const QModelIndexList &list) {
   for (const auto &item : list) {
-    if (not modelContaReceber.setData(item.row(), "status", "RECEBIDO")) { return false; }
-    if (not modelContaReceber.setData(item.row(), "dataRealizado", ui->dateEditEvento->date())) { return false; }
-    if (not modelContaReceber.setData(item.row(), "valorReal", modelContaReceber.data(item.row(), "valor"))) { return false; }
-    if (not modelContaReceber.setData(item.row(), "tipoReal", modelContaReceber.data(item.row(), "tipo"))) { return false; }
-    if (not modelContaReceber.setData(item.row(), "parcelaReal", modelContaReceber.data(item.row(), "parcela"))) { return false; }
-    if (not modelContaReceber.setData(item.row(), "tipoReal", modelContaReceber.data(item.row(), "tipo"))) { return false; }
-    if (not modelContaReceber.setData(item.row(), "contaDestino", ui->itemBoxConta->getValue())) { return false; }
+    const int row = item.row();
 
-    if (modelContaReceber.data(item.row(), "centroCusto").isNull()) {
-      emit errorSignal("Item sem Centro de Custo identificado: " + modelContaReceber.data(item.row(), "idVenda").toString());
-      return false;
-    }
+    if (not modelContaReceber.setData(row, "status", "RECEBIDO")) { return false; }
+    if (not modelContaReceber.setData(row, "dataRealizado", ui->dateEditEvento->date())) { return false; }
+    if (not modelContaReceber.setData(row, "valorReal", modelContaReceber.data(row, "valor"))) { return false; }
+    if (not modelContaReceber.setData(row, "tipoReal", modelContaReceber.data(row, "tipo"))) { return false; }
+    if (not modelContaReceber.setData(row, "parcelaReal", modelContaReceber.data(row, "parcela"))) { return false; }
+    if (not modelContaReceber.setData(row, "tipoReal", modelContaReceber.data(row, "tipo"))) { return false; }
+    if (not modelContaReceber.setData(row, "contaDestino", ui->itemBoxConta->getId())) { return false; }
 
-    if (modelContaReceber.data(item.row(), "grupo").isNull()) {
-      emit errorSignal("Item sem Grupo identificado: " + modelContaReceber.data(item.row(), "idVenda").toString());
-      return false;
-    }
+    if (modelContaReceber.data(row, "centroCusto").isNull()) { return qApp->enqueueError(false, "Item sem Centro de Custo identificado: " + modelContaReceber.data(row, "idVenda").toString(), this); }
 
-    if (not modelContaReceber.setData(item.row(), "observacao", modelContaReceber.data(item.row(), "observacao").toString() + "Antecipação")) { return false; }
+    if (modelContaReceber.data(row, "grupo").isNull()) { return qApp->enqueueError(false, "Item sem Grupo identificado: " + modelContaReceber.data(row, "idVenda").toString(), this); }
+
+    if (not modelContaReceber.setData(row, "observacao", modelContaReceber.data(row, "observacao").toString() + "Antecipação")) { return false; }
   }
 
   if (not modelContaReceber.submitAll()) { return false; }
-
-  const int newRow = modelContaReceber.rowCount();
-  if (not modelContaReceber.insertRow(newRow)) { return false; }
 
   //----------------------------------
 
   SqlRelationalTableModel modelContaPagar;
   modelContaPagar.setTable("conta_a_pagar_has_pagamento");
-  modelContaPagar.setEditStrategy(QSqlTableModel::OnManualSubmit);
 
   QSqlQuery query;
   query.prepare("SELECT banco FROM loja_has_conta WHERE idConta = :idConta");
-  query.bindValue(":idConta", ui->itemBoxConta->getValue());
+  query.bindValue(":idConta", ui->itemBoxConta->getId());
 
-  if (not query.exec() or not query.first()) {
-    emit errorSignal("Erro buscando 'banco': " + query.lastError().text());
-    return false;
-  }
+  if (not query.exec() or not query.first()) { return qApp->enqueueError(false, "Erro buscando 'banco': " + query.lastError().text(), this); }
 
   if (ui->doubleSpinBoxValorLiquido->value() - ui->doubleSpinBoxValorPresente->value() > 0) {
-    const int rowPagar1 = modelContaPagar.rowCount();
-    if (not modelContaPagar.insertRow(rowPagar1)) { return false; }
+    const int rowPagar1 = modelContaPagar.insertRowAtEnd();
 
     if (not modelContaPagar.setData(rowPagar1, "dataEmissao", ui->dateEditEvento->date())) { return false; }
     if (not modelContaPagar.setData(rowPagar1, "idLoja", 1)) { return false; }
@@ -248,7 +235,7 @@ bool AnteciparRecebimento::cadastrar(const QModelIndexList &list) {
     if (not modelContaPagar.setData(rowPagar1, "dataRealizado", ui->dateEditEvento->date())) { return false; }
     if (not modelContaPagar.setData(rowPagar1, "valorReal", ui->doubleSpinBoxValorLiquido->value() - ui->doubleSpinBoxValorPresente->value())) { return false; }
     if (not modelContaPagar.setData(rowPagar1, "tipoReal", "DÉBITO EM CONTA")) { return false; }
-    if (not modelContaPagar.setData(rowPagar1, "contaDestino", ui->itemBoxConta->getValue())) { return false; }
+    if (not modelContaPagar.setData(rowPagar1, "contaDestino", ui->itemBoxConta->getId())) { return false; }
     if (not modelContaPagar.setData(rowPagar1, "centroCusto", "1")) { return false; }
     if (not modelContaPagar.setData(rowPagar1, "grupo", "Despesas Financeiras")) { return false; }
     if (not modelContaPagar.setData(rowPagar1, "subGrupo", "Juros")) { return false; }
@@ -257,8 +244,7 @@ bool AnteciparRecebimento::cadastrar(const QModelIndexList &list) {
   //
 
   if (ui->doubleSpinBoxIOF->value() > 0) {
-    const int rowPagar2 = modelContaPagar.rowCount();
-    if (not modelContaPagar.insertRow(rowPagar2)) { return false; }
+    const int rowPagar2 = modelContaPagar.insertRowAtEnd();
 
     if (not modelContaPagar.setData(rowPagar2, "dataEmissao", ui->dateEditEvento->date())) { return false; }
     if (not modelContaPagar.setData(rowPagar2, "idLoja", 1)) { return false; }
@@ -271,15 +257,13 @@ bool AnteciparRecebimento::cadastrar(const QModelIndexList &list) {
     if (not modelContaPagar.setData(rowPagar2, "dataRealizado", ui->dateEditEvento->date())) { return false; }
     if (not modelContaPagar.setData(rowPagar2, "valorReal", ui->doubleSpinBoxIOF->value())) { return false; }
     if (not modelContaPagar.setData(rowPagar2, "tipoReal", "DÉBITO EM CONTA")) { return false; }
-    if (not modelContaPagar.setData(rowPagar2, "contaDestino", ui->itemBoxConta->getValue())) { return false; }
+    if (not modelContaPagar.setData(rowPagar2, "contaDestino", ui->itemBoxConta->getId())) { return false; }
     if (not modelContaPagar.setData(rowPagar2, "centroCusto", "1")) { return false; }
     if (not modelContaPagar.setData(rowPagar2, "grupo", "Despesas Financeiras")) { return false; }
     if (not modelContaPagar.setData(rowPagar2, "subGrupo", "IOF")) { return false; }
   }
 
-  if (not modelContaPagar.submitAll()) { return false; }
-
-  return true;
+  return modelContaPagar.submitAll();
 }
 
 void AnteciparRecebimento::on_pushButtonGerar_clicked() {
@@ -288,27 +272,15 @@ void AnteciparRecebimento::on_pushButtonGerar_clicked() {
 
   const auto list = ui->table->selectionModel()->selectedRows();
 
-  if (list.isEmpty()) {
-    emit errorSignal("Nenhum item selecionado!");
-    return;
-  }
+  if (list.isEmpty()) { return qApp->enqueueError("Nenhum item selecionado!", this); }
 
-  emit transactionStarted();
+  if (not qApp->startTransaction()) { return; }
 
-  if (not QSqlQuery("SET SESSION TRANSACTION ISOLATION LEVEL SERIALIZABLE").exec()) { return; }
-  if (not QSqlQuery("START TRANSACTION").exec()) { return; }
+  if (not cadastrar(list)) { return qApp->rollbackTransaction(); }
 
-  if (not cadastrar(list)) {
-    QSqlQuery("ROLLBACK").exec();
-    emit transactionEnded();
-    return;
-  }
+  if (not qApp->endTransaction()) { return; }
 
-  if (not QSqlQuery("COMMIT").exec()) { return; }
-
-  emit transactionEnded();
-
-  emit informationSignal("Operação realizada com sucesso!");
+  qApp->enqueueInformation("Operação realizada com sucesso!", this);
 }
 
 // TODO: 0implementar antecipacao

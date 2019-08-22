@@ -1,9 +1,7 @@
-#ifndef USERSESSION_H
-#define USERSESSION_H
+#pragma once
 
 #include <QSettings>
 #include <QSqlQuery>
-#include <optional>
 
 class UserSession final {
 
@@ -22,10 +20,8 @@ public:
 
 private:
   // attributes
-  inline static QSqlQuery *query = nullptr;
+  inline static QSqlQuery *query = nullptr; // defer creating query until database is set
   inline static QSettings *settings = new QSettings("Staccato", "ERP");
   // methods
   static auto initializeQuery() -> void;
 };
-
-#endif // USERSESSION_H

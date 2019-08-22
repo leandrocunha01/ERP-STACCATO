@@ -26,29 +26,8 @@ ItemBox::ItemBox(QWidget *parent) : QLineEdit(parent) {
 }
 
 void ItemBox::resizeEvent(QResizeEvent *event) {
+  setIcons();
   QLineEdit::resizeEvent(event);
-
-  const QSize size = searchButton->minimumSizeHint();
-  int x = rect().right();
-  int y = (rect().height() - size.height()) / 2;
-
-  if (searchDialog) {
-    x -= size.width();
-    searchButton->setGeometry(QRect(QPoint(x, y), size));
-  } else {
-    searchButton->hide();
-  }
-
-  if (registerDialog) {
-    x -= size.width();
-    plusButton->setGeometry(QRect(QPoint(x, y), size));
-  } else {
-    plusButton->hide();
-  }
-
-  int left, top, bottom;
-  getTextMargins(&left, &top, nullptr, &bottom);
-  setTextMargins(left, top, 2 + rect().right() - x + 2, bottom);
 }
 
 void ItemBox::search() {
@@ -57,62 +36,54 @@ void ItemBox::search() {
 
 void ItemBox::edit() {
   if (registerDialog) {
-    if (not value.isNull()) { registerDialog->viewRegisterById(value); }
+    if (not id.isNull()) { registerDialog->viewRegisterById(id); }
 
     registerDialog->show();
   }
 }
 
-// REFAC: replace this with eliding? https://wiki.qt.io/Elided_Label
 void ItemBox::resetCursor() { setCursorPosition(0); }
 
-void ItemBox::setRegisterDialog(RegisterDialog *value) {
-  registerDialog = value;
-  connect(value, &RegisterDialog::registerUpdated, this, &ItemBox::changeItem);
+void ItemBox::setRegisterDialog(RegisterDialog *dialog) {
+  registerDialog = dialog;
+  connect(dialog, &RegisterDialog::registerUpdated, this, &ItemBox::changeItem);
+  setIcons();
 }
 
-SearchDialog *ItemBox::getSearchDialog() { return searchDialog; }
+QVariant ItemBox::getId() const { return id; }
 
-QVariant ItemBox::getValue() const { return value; }
+void ItemBox::setId(const QVariant &newId) {
+  if (newId.isNull()) { return; }
+  if (id == newId) { return; }
 
-void ItemBox::setValue(const QVariant &value) {
-  if (value.isNull()) { return; }
-  if (this->value == value) { return; }
+  id = newId;
 
-  this->value = value;
-
-  if (searchDialog) { setText(searchDialog->getText(value)); }
+  if (searchDialog) { setText(searchDialog->getText(newId)); }
 
   QLineEdit::setToolTip(text());
 
-  emit valueChanged(value);
+  emit idChanged(newId);
 }
 
-void ItemBox::setReadOnlyItemBox(const bool isReadOnly) {
-  readOnlyItemBox = isReadOnly;
-
-  plusButton->setHidden(isReadOnly);
-  plusButton->setDisabled(isReadOnly);
-  searchButton->setHidden(isReadOnly);
-  searchButton->setDisabled(isReadOnly);
-}
+void ItemBox::setReadOnlyItemBox(const bool isReadOnly) { readOnlyItemBox = isReadOnly; }
 
 void ItemBox::clear() {
-  value.clear();
+  id.clear();
 
   QLineEdit::clear();
 }
 
-void ItemBox::setSearchDialog(SearchDialog *value) {
-  searchDialog = value;
+void ItemBox::setSearchDialog(SearchDialog *dialog) {
+  searchDialog = dialog;
   connect(searchDialog, &SearchDialog::itemSelected, this, &ItemBox::changeItem);
+  setIcons();
 }
 
-void ItemBox::changeItem(const QVariant &value) {
-  setValue(value);
+void ItemBox::changeItem(const QVariant &newId) {
+  setId(newId);
 
-  if (registerDialog) registerDialog->close();
-  if (searchDialog) searchDialog->close();
+  if (registerDialog) { registerDialog->close(); }
+  if (searchDialog) { searchDialog->close(); }
 }
 
 void ItemBox::mouseDoubleClickEvent(QMouseEvent *event) {
@@ -121,3 +92,37 @@ void ItemBox::mouseDoubleClickEvent(QMouseEvent *event) {
   search();
   event->accept();
 }
+
+void ItemBox::setIcons() {
+  const QSize size = searchButton->minimumSizeHint();
+  int x = rect().right();
+  int y = (rect().height() - size.height()) / 2;
+
+  if (searchDialog and not readOnlyItemBox) {
+    x -= size.width();
+    searchButton->setGeometry(QRect(QPoint(x, y), size));
+    searchButton->show();
+  } else {
+    searchButton->hide();
+  }
+
+  if (registerDialog) {
+    x -= size.width();
+    plusButton->setGeometry(QRect(QPoint(x, y), size));
+    plusButton->show();
+  } else {
+    plusButton->hide();
+  }
+
+  int left, top, bottom;
+  getTextMargins(&left, &top, nullptr, &bottom);
+  setTextMargins(left, top, rect().right() - x + 4, bottom);
+}
+
+void ItemBox::setRepresentacao(const bool isRepresentacao) { searchDialog->setRepresentacao(isRepresentacao); }
+
+void ItemBox::setFilter(const QString &filter) { searchDialog->setFilter(filter); }
+
+void ItemBox::setFornecedorRep(const QString &fornecedor) { searchDialog->setFornecedorRep(fornecedor); }
+
+// REFAC: replace this with eliding? https://wiki.qt.io/Elided_Label

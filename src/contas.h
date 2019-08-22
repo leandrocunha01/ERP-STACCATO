@@ -1,14 +1,14 @@
-#ifndef CONTAS_H
-#define CONTAS_H
+#pragma once
 
-#include "dialog.h"
+#include <QDialog>
+
 #include "sqlrelationaltablemodel.h"
 
 namespace Ui {
 class Contas;
 }
 
-class Contas final : public Dialog {
+class Contas final : public QDialog {
   Q_OBJECT
 
 public:
@@ -25,12 +25,8 @@ private:
   Ui::Contas *ui;
   // methods
   auto on_pushButtonSalvar_clicked() -> void;
-  auto on_tablePendentes_entered(const QModelIndex &) -> void;
-  auto on_tableProcessados_entered(const QModelIndex &) -> void;
   auto preencher(const QModelIndex &index) -> void;
   auto setupTables() -> void;
   auto validarData(const QModelIndex &index) -> void;
   auto verifyFields() -> bool;
 };
-
-#endif // CONTAS_H

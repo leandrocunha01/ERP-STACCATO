@@ -131,6 +131,19 @@
                    </widget>
                   </item>
                   <item>
+                   <widget class="QLabel" name="labelConsultor">
+                    <property name="sizePolicy">
+                     <sizepolicy hsizetype="Fixed" vsizetype="Preferred">
+                      <horstretch>0</horstretch>
+                      <verstretch>0</verstretch>
+                     </sizepolicy>
+                    </property>
+                    <property name="text">
+                     <string>Consultor:</string>
+                    </property>
+                   </widget>
+                  </item>
+                  <item>
                    <widget class="QLabel" name="labelCliente">
                     <property name="text">
                      <string>Cliente:</string>
@@ -156,6 +169,9 @@
                   </item>
                   <item>
                    <widget class="ItemBox" name="itemBoxVendedor"/>
+                  </item>
+                  <item>
+                   <widget class="ItemBox" name="itemBoxConsultor"/>
                   </item>
                   <item>
                    <widget class="ItemBox" name="itemBoxCliente">
@@ -378,9 +394,6 @@ color: rgb(0, 0, 0);</string>
            </item>
            <item row="4" column="1">
             <widget class="QSpinBox" name="spinBoxPrazoEntrega">
-             <property name="toolTip">
-              <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Validade em dias do orçamento, contando a partir de hoje&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-             </property>
              <property name="suffix">
               <string> dias</string>
              </property>
@@ -404,7 +417,7 @@ color: rgb(0, 0, 0);</string>
               <bool>true</bool>
              </property>
              <property name="selectionMode">
-              <enum>QAbstractItemView::NoSelection</enum>
+              <enum>QAbstractItemView::MultiSelection</enum>
              </property>
              <property name="selectionBehavior">
               <enum>QAbstractItemView::SelectRows</enum>
@@ -483,135 +496,61 @@ color: rgb(0, 0, 0);</string>
           <property name="lineWidth">
            <number>0</number>
           </property>
-          <layout class="QGridLayout" name="gridLayout_14">
-           <item row="2" column="0">
-            <widget class="QFrame" name="framePagamentos_2">
-             <layout class="QGridLayout" name="gridLayout_9">
-              <item row="2" column="0" colspan="2">
-               <widget class="WidgetPagamentos" name="widgetPgts" native="true"/>
-              </item>
-              <item row="3" column="0">
-               <widget class="QPushButton" name="pushButtonFreteLoja">
-                <property name="text">
-                 <string>Frete pago à loja</string>
-                </property>
-                <property name="autoDefault">
-                 <bool>false</bool>
-                </property>
-               </widget>
-              </item>
-              <item row="4" column="0" colspan="2">
-               <layout class="QHBoxLayout" name="horizontalLayout_3">
-                <item>
-                 <widget class="QPushButton" name="pushButtonLimparPag">
-                  <property name="text">
-                   <string>Limpar pagamentos</string>
-                  </property>
-                  <property name="autoDefault">
-                   <bool>false</bool>
-                  </property>
-                 </widget>
-                </item>
-                <item>
-                 <widget class="QLabel" name="labelRestante">
-                  <property name="sizePolicy">
-                   <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
-                    <horstretch>0</horstretch>
-                    <verstretch>0</verstretch>
-                   </sizepolicy>
-                  </property>
-                  <property name="text">
-                   <string>Total:</string>
-                  </property>
-                  <property name="alignment">
-                   <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-                  </property>
-                 </widget>
-                </item>
-                <item>
-                 <widget class="QDoubleSpinBox" name="doubleSpinBoxTotalPag">
-                  <property name="readOnly">
-                   <bool>true</bool>
-                  </property>
-                  <property name="buttonSymbols">
-                   <enum>QAbstractSpinBox::NoButtons</enum>
-                  </property>
-                  <property name="showGroupSeparator" stdset="0">
-                   <bool>true</bool>
-                  </property>
-                  <property name="prefix">
-                   <string>R$ </string>
-                  </property>
-                  <property name="maximum">
-                   <double>999999.989999999990687</double>
-                  </property>
-                 </widget>
-                </item>
-               </layout>
-              </item>
-              <item row="3" column="1">
-               <widget class="QPushButton" name="pushButtonPgtLoja">
-                <property name="text">
-                 <string>Pag. total à loja</string>
-                </property>
-                <property name="autoDefault">
-                 <bool>false</bool>
-                </property>
-               </widget>
-              </item>
-              <item row="0" column="0" colspan="2">
-               <layout class="QGridLayout" name="gridLayout_11">
-                <item row="0" column="0">
-                 <widget class="QLabel" name="label_4">
-                  <property name="text">
-                   <string>Saldo cliente</string>
-                  </property>
-                 </widget>
-                </item>
-                <item row="0" column="1">
-                 <widget class="QDoubleSpinBox" name="doubleSpinBoxCreditoTotal">
-                  <property name="sizePolicy">
-                   <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
-                    <horstretch>0</horstretch>
-                    <verstretch>0</verstretch>
-                   </sizepolicy>
-                  </property>
-                  <property name="minimumSize">
-                   <size>
-                    <width>80</width>
-                    <height>0</height>
-                   </size>
-                  </property>
-                  <property name="readOnly">
-                   <bool>true</bool>
-                  </property>
-                  <property name="showGroupSeparator" stdset="0">
-                   <bool>true</bool>
-                  </property>
-                  <property name="prefix">
-                   <string>R$ </string>
-                  </property>
-                  <property name="maximum">
-                   <double>999999.989999999990687</double>
-                  </property>
-                 </widget>
-                </item>
-               </layout>
-              </item>
-              <item row="1" column="0" colspan="2">
-               <widget class="QPushButton" name="pushButtonAdicionarPagamento">
-                <property name="text">
-                 <string>Adicionar pagamento</string>
-                </property>
-                <property name="autoDefault">
-                 <bool>false</bool>
-                </property>
-               </widget>
-              </item>
-             </layout>
+          <layout class="QGridLayout" name="gridLayout_3">
+           <item row="0" column="0">
+            <widget class="TableView" name="tableFluxoCaixa">
+             <property name="sizePolicy">
+              <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
+               <horstretch>0</horstretch>
+               <verstretch>0</verstretch>
+              </sizepolicy>
+             </property>
+             <property name="mouseTracking">
+              <bool>true</bool>
+             </property>
+             <property name="selectionBehavior">
+              <enum>QAbstractItemView::SelectRows</enum>
+             </property>
+             <property name="sortingEnabled">
+              <bool>true</bool>
+             </property>
+             <attribute name="horizontalHeaderStretchLastSection">
+              <bool>false</bool>
+             </attribute>
             </widget>
            </item>
-           <item row="3" column="0">
+           <item row="1" column="0">
+            <widget class="QSplitter" name="splitter_2">
+             <property name="orientation">
+              <enum>Qt::Vertical</enum>
+             </property>
+             <widget class="TableView" name="tableFluxoCaixa2">
+              <property name="sizePolicy">
+               <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
+                <horstretch>0</horstretch>
+                <verstretch>0</verstretch>
+               </sizepolicy>
+              </property>
+              <property name="mouseTracking">
+               <bool>true</bool>
+              </property>
+              <property name="editTriggers">
+               <set>QAbstractItemView::NoEditTriggers</set>
+              </property>
+              <property name="selectionBehavior">
+               <enum>QAbstractItemView::SelectRows</enum>
+              </property>
+              <property name="sortingEnabled">
+               <bool>true</bool>
+              </property>
+              <attribute name="horizontalHeaderStretchLastSection">
+               <bool>false</bool>
+              </attribute>
+             </widget>
+             <widget class="WidgetPagamentos" name="widgetPgts" native="true"/>
+            </widget>
+           </item>
+           <item row="2" column="0">
             <widget class="QGroupBox" name="groupBox_3">
              <property name="title">
               <string>Totais</string>
@@ -749,7 +688,7 @@ color: rgb(0, 0, 0);</string>
                  <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Sub-total bruto é o total do valor dos itens, &lt;span style=&quot; font-weight:600;&quot;&gt;sem nenhum desconto&lt;/span&gt;.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
                 </property>
                 <property name="frame">
-                 <bool>false</bool>
+                 <bool>true</bool>
                 </property>
                 <property name="readOnly">
                  <bool>true</bool>
@@ -851,7 +790,7 @@ color: rgb(0, 0, 0);</string>
                  <bool>false</bool>
                 </property>
                 <property name="frame">
-                 <bool>false</bool>
+                 <bool>true</bool>
                 </property>
                 <property name="readOnly">
                  <bool>true</bool>
@@ -882,7 +821,7 @@ color: rgb(0, 0, 0);</string>
                  <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Sub-total líq. do orçamento é o subtotal dos itens com desconto&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
                 </property>
                 <property name="frame">
-                 <bool>false</bool>
+                 <bool>true</bool>
                 </property>
                 <property name="readOnly">
                  <bool>true</bool>
@@ -990,53 +929,6 @@ color: rgb(0, 0, 0);</string>
                </widget>
               </item>
              </layout>
-            </widget>
-           </item>
-           <item row="0" column="0">
-            <widget class="TableView" name="tableFluxoCaixa">
-             <property name="sizePolicy">
-              <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
-               <horstretch>0</horstretch>
-               <verstretch>0</verstretch>
-              </sizepolicy>
-             </property>
-             <property name="mouseTracking">
-              <bool>true</bool>
-             </property>
-             <property name="selectionBehavior">
-              <enum>QAbstractItemView::SelectRows</enum>
-             </property>
-             <property name="sortingEnabled">
-              <bool>true</bool>
-             </property>
-             <attribute name="horizontalHeaderStretchLastSection">
-              <bool>false</bool>
-             </attribute>
-            </widget>
-           </item>
-           <item row="1" column="0">
-            <widget class="TableView" name="tableFluxoCaixa2">
-             <property name="sizePolicy">
-              <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
-               <horstretch>0</horstretch>
-               <verstretch>0</verstretch>
-              </sizepolicy>
-             </property>
-             <property name="mouseTracking">
-              <bool>true</bool>
-             </property>
-             <property name="editTriggers">
-              <set>QAbstractItemView::NoEditTriggers</set>
-             </property>
-             <property name="selectionBehavior">
-              <enum>QAbstractItemView::SelectRows</enum>
-             </property>
-             <property name="sortingEnabled">
-              <bool>true</bool>
-             </property>
-             <attribute name="horizontalHeaderStretchLastSection">
-              <bool>false</bool>
-             </attribute>
             </widget>
            </item>
           </layout>
@@ -1246,11 +1138,44 @@ color: rgb(0, 0, 0);</string>
  </customwidgets>
  <tabstops>
   <tabstop>tabWidget</tabstop>
+  <tabstop>lineEditVenda</tabstop>
+  <tabstop>itemBoxVendedor</tabstop>
+  <tabstop>itemBoxConsultor</tabstop>
+  <tabstop>itemBoxCliente</tabstop>
+  <tabstop>dateTimeEdit</tabstop>
+  <tabstop>itemBoxProfissional</tabstop>
+  <tabstop>itemBoxEndereco</tabstop>
   <tabstop>tableProdutos</tabstop>
-  <tabstop>pushButtonLimparPag</tabstop>
-  <tabstop>doubleSpinBoxTotalPag</tabstop>
+  <tabstop>lineEditEstoque_2</tabstop>
+  <tabstop>lineEditEstoque_3</tabstop>
+  <tabstop>lineEditPromocao_2</tabstop>
+  <tabstop>spinBoxPrazoEntrega</tabstop>
+  <tabstop>itemBoxEnderecoFat</tabstop>
+  <tabstop>plainTextEdit</tabstop>
+  <tabstop>dateTimeEditOrc</tabstop>
+  <tabstop>lineEditIdOrcamento</tabstop>
+  <tabstop>checkBoxRT</tabstop>
+  <tabstop>checkBoxPontuacaoIsento</tabstop>
+  <tabstop>checkBoxPontuacaoPadrao</tabstop>
+  <tabstop>doubleSpinBoxPontuacao</tabstop>
+  <tabstop>tableFluxoCaixa</tabstop>
+  <tabstop>tableFluxoCaixa2</tabstop>
+  <tabstop>doubleSpinBoxSubTotalBruto</tabstop>
+  <tabstop>doubleSpinBoxSubTotalLiq</tabstop>
+  <tabstop>doubleSpinBoxDescontoGlobalReais</tabstop>
+  <tabstop>doubleSpinBoxDescontoGlobal</tabstop>
+  <tabstop>checkBoxFreteManual</tabstop>
+  <tabstop>doubleSpinBoxFrete</tabstop>
+  <tabstop>doubleSpinBoxTotal</tabstop>
   <tabstop>pushButtonCadastrarPedido</tabstop>
+  <tabstop>pushButtonGerarExcel</tabstop>
   <tabstop>pushButtonImprimir</tabstop>
+  <tabstop>pushButtonDevolucao</tabstop>
+  <tabstop>pushButtonCancelamento</tabstop>
+  <tabstop>pushButtonVoltar</tabstop>
+  <tabstop>comboBoxFinanceiro</tabstop>
+  <tabstop>pushButtonCorrigirFluxo</tabstop>
+  <tabstop>pushButtonFinanceiroSalvar</tabstop>
  </tabstops>
  <resources/>
  <connections/>

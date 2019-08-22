@@ -1,10 +1,10 @@
-#include <QMessageBox>
 #include <QSqlError>
 
+#include "application.h"
 #include "baixaorcamento.h"
 #include "ui_baixaorcamento.h"
 
-BaixaOrcamento::BaixaOrcamento(const QString &idOrcamento, QWidget *parent) : Dialog(parent), ui(new Ui::BaixaOrcamento) {
+BaixaOrcamento::BaixaOrcamento(const QString &idOrcamento, QWidget *parent) : QDialog(parent), ui(new Ui::BaixaOrcamento) {
   ui->setupUi(this);
 
   setupTables(idOrcamento);
@@ -17,41 +17,33 @@ BaixaOrcamento::~BaixaOrcamento() { delete ui; }
 
 void BaixaOrcamento::setupTables(const QString &idOrcamento) {
   modelOrcamento.setTable("orcamento");
-  modelOrcamento.setEditStrategy(QSqlTableModel::OnManualSubmit);
+
   modelOrcamento.setFilter("idOrcamento = '" + idOrcamento + "'");
 
-  if (not modelOrcamento.select()) { emit errorSignal("Erro lendo tabela orcamento: " + modelOrcamento.lastError().text()); }
+  if (not modelOrcamento.select()) { return; }
 }
 
 void BaixaOrcamento::on_pushButtonCancelar_clicked() { close(); }
 
 void BaixaOrcamento::on_pushButtonSalvar_clicked() {
-  if (ui->plainTextEditObservacao->toPlainText().isEmpty()) {
-    emit errorSignal("Deve preencher a observação!");
-    return;
-  }
+  if (ui->plainTextEditObservacao->toPlainText().isEmpty()) { return qApp->enqueueError("Deve preencher a observação!", this); }
 
+  const auto children = ui->groupBox->findChildren<QRadioButton *>();
   QString motivo;
 
-  Q_FOREACH (const auto &child, ui->groupBox->findChildren<QRadioButton *>()) {
+  for (const auto &child : children) {
     if (child->isChecked()) { motivo = child->text(); }
   }
 
-  if (motivo.isEmpty()) {
-    emit errorSignal("Deve escolher um motivo!");
-    return;
-  }
+  if (motivo.isEmpty()) { return qApp->enqueueError("Deve escolher um motivo!", this); }
 
   if (not modelOrcamento.setData(0, "status", "PERDIDO")) { return; }
   if (not modelOrcamento.setData(0, "motivoCancelamento", motivo)) { return; }
   if (not modelOrcamento.setData(0, "observacaoCancelamento", ui->plainTextEditObservacao->toPlainText())) { return; }
 
-  if (not modelOrcamento.submitAll()) {
-    emit errorSignal("Erro cancelando orçamento: " + modelOrcamento.lastError().text());
-    return;
-  }
+  if (not modelOrcamento.submitAll()) { return; }
 
-  // TODO: exibir mensagem de confirmacao
+  qApp->enqueueInformation("Baixa salva!", this);
 
   close();
   parentWidget()->close();

@@ -6,6 +6,7 @@
 #include <QSqlQuery>
 #include <QSqlRecord>
 
+#include "application.h"
 #include "doubledelegate.h"
 #include "estoque.h"
 #include "inputdialog.h"
@@ -15,7 +16,7 @@
 #include "sql.h"
 #include "ui_produtospendentes.h"
 
-ProdutosPendentes::ProdutosPendentes(QWidget *parent) : Dialog(parent), ui(new Ui::ProdutosPendentes) {
+ProdutosPendentes::ProdutosPendentes(const QString &codComercial, const QString &idVenda, QWidget *parent) : QDialog(parent), ui(new Ui::ProdutosPendentes) {
   ui->setupUi(this);
 
   setWindowFlags(Qt::Window);
@@ -24,49 +25,33 @@ ProdutosPendentes::ProdutosPendentes(QWidget *parent) : Dialog(parent), ui(new U
 
   connect(ui->pushButtonComprar, &QPushButton::clicked, this, &ProdutosPendentes::on_pushButtonComprar_clicked);
   connect(ui->pushButtonConsumirEstoque, &QPushButton::clicked, this, &ProdutosPendentes::on_pushButtonConsumirEstoque_clicked);
-  connect(ui->tableProdutos, &TableView::entered, this, &ProdutosPendentes::on_tableProdutos_entered);
   connect(ui->tableProdutos->selectionModel(), &QItemSelectionModel::selectionChanged, this, &ProdutosPendentes::recalcularQuantidade);
 
+  viewProduto(codComercial, idVenda);
+
   show();
-  ui->tableProdutos->resizeColumnsToContents();
 }
 
 ProdutosPendentes::~ProdutosPendentes() { delete ui; }
 
 void ProdutosPendentes::recalcularQuantidade() {
+  const auto selectedRows = ui->tableProdutos->selectionModel()->selectedRows();
   double quant = 0;
 
-  Q_FOREACH (const auto &item, ui->tableProdutos->selectionModel()->selectedRows()) { quant += modelViewProdutos.data(item.row(), "quant").toDouble(); }
+  for (const auto &item : selectedRows) { quant += modelViewProdutos.data(item.row(), "quant").toDouble(); }
 
-  ui->doubleSpinBoxComprar->setMinimum(quant);
+  ui->doubleSpinBoxQuantTotal->setValue(quant);
   ui->doubleSpinBoxComprar->setValue(quant);
 }
 
 void ProdutosPendentes::viewProduto(const QString &codComercial, const QString &idVenda) {
-  // NOTE: put this in the constructor because this object always use this function?
+  modelProdutos.setFilter("codComercial = '" + codComercial + "' AND idVenda = '" + idVenda + "' AND status IN ('PENDENTE', 'REPO. ENTREGA', 'REPO. RECEB.')");
 
-  this->codComercial = codComercial;
+  if (not modelProdutos.select()) { return; }
 
-  modelProdutos.setFilter("codComercial = '" + codComercial + "' AND idVenda = '" + idVenda + "' AND (status = 'PENDENTE' OR status = 'REPO. ENTREGA' OR status = 'REPO. RECEB.')");
+  modelViewProdutos.setFilter("codComercial = '" + codComercial + "' AND idVenda = '" + idVenda + "' AND status IN ('PENDENTE', 'REPO. ENTREGA', 'REPO. RECEB.')");
 
-  if (not modelProdutos.select()) {
-    emit errorSignal("Erro lendo tabela venda_has_produto: " + modelProdutos.lastError().text());
-    return;
-  }
-
-  modelViewProdutos.setFilter("codComercial = '" + codComercial + "' AND idVenda = '" + idVenda + "' AND (status = 'PENDENTE' OR status = 'REPO. ENTREGA' OR status = 'REPO. RECEB.')");
-
-  if (not modelViewProdutos.select()) {
-    emit errorSignal("Erro lendo tabela view_produto_pendente: " + modelViewProdutos.lastError().text());
-    return;
-  }
-
-  double quant = 0;
-
-  for (int row = 0; row < modelViewProdutos.rowCount(); ++row) quant += modelViewProdutos.data(row, "quant").toDouble();
-
-  ui->doubleSpinBoxQuantTotal->setValue(quant);
-  ui->doubleSpinBoxComprar->setValue(quant);
+  if (not modelViewProdutos.select()) { return; }
 
   ui->doubleSpinBoxQuantTotal->setSuffix(" " + modelViewProdutos.data(0, "un").toString());
   ui->doubleSpinBoxComprar->setSuffix(" " + modelViewProdutos.data(0, "un").toString());
@@ -75,32 +60,24 @@ void ProdutosPendentes::viewProduto(const QString &codComercial, const QString &
   query.prepare("SELECT unCaixa FROM venda_has_produto WHERE idVendaProduto = :idVendaProduto");
   query.bindValue(":idVendaProduto", modelViewProdutos.data(0, "idVendaProduto"));
 
-  if (not query.exec() or not query.first()) {
-    emit errorSignal("Erro buscando unCaixa: " + query.lastError().text());
-    return;
-  }
+  if (not query.exec() or not query.first()) { return qApp->enqueueError("Erro buscando unCaixa: " + query.lastError().text(), this); }
 
   const double step = query.value("unCaixa").toDouble();
 
   ui->doubleSpinBoxQuantTotal->setSingleStep(step);
   ui->doubleSpinBoxComprar->setSingleStep(step);
-  ui->doubleSpinBoxComprar->setMinimum(step);
-
-  ui->tableProdutos->resizeColumnsToContents();
 
   const QString fornecedor = modelViewProdutos.data(0, "fornecedor").toString();
 
-  modelEstoque.setQuery("SELECT `e`.`status` AS `status`, `e`.`idEstoque` AS `idEstoque`, `e`.`descricao` AS `descricao`, (`e`.`quant` + COALESCE(SUM(`ec`.`quant`), 0)) AS `restante`, `e`.`un` AS "
-                        "`unEst`, IF(((`p`.`un` = 'M²') OR (`p`.`un` = 'M2') OR (`p`.`un` = 'ML')), ((`e`.`quant` + COALESCE(SUM(`ec`.`quant`), 0)) / `p`.`m2cx`), ((`e`.`quant` + "
-                        "COALESCE(SUM(`ec`.`quant`), 0)) / `p`.`pccx`)) AS `Caixas`, `e`.`lote` AS `lote`, `e`.`local` AS `local`, `e`.`bloco` AS `bloco`, `e`.`codComercial` AS `codComercial` FROM "
-                        "`estoque` `e` LEFT JOIN `estoque_has_consumo` `ec` ON `e`.`idEstoque` = `ec`.`idEstoque` LEFT JOIN `produto` `p` ON `e`.`idProduto` = `p`.`idProduto` LEFT JOIN "
-                        "`venda_has_produto` `vp` ON `ec`.`idVendaProduto` = `vp`.`idVendaProduto` WHERE ((`e`.`status` <> 'CANCELADO') AND (`e`.`status` <> 'QUEBRADO')) AND p.fornecedor = '" +
-                        fornecedor + "' AND e.codComercial = '" + codComercial + "' GROUP BY `e`.`idEstoque` HAVING restante > 0");
+  modelEstoque.setQuery(
+      "SELECT `e`.`status` AS `status`, `e`.`idEstoque` AS `idEstoque`, `e`.`descricao` AS `descricao`, (`e`.`quant` + COALESCE(SUM(`ec`.`quant`), 0)) AS `restante`, `e`.`un` AS "
+      "`unEst`, IF(((`p`.`un` = 'M²') OR (`p`.`un` = 'M2') OR (`p`.`un` = 'ML')), ((`e`.`quant` + COALESCE(SUM(`ec`.`quant`), 0)) / `p`.`m2cx`), ((`e`.`quant` + COALESCE(SUM(`ec`.`quant`), 0)) / "
+      "`p`.`pccx`)) AS `Caixas`, `e`.`lote` AS `lote`, `e`.`local` AS `local`, `e`.`bloco` AS `bloco`, `e`.`codComercial` AS `codComercial` FROM `estoque` `e` LEFT JOIN `estoque_has_consumo` `ec` ON "
+      "`e`.`idEstoque` = `ec`.`idEstoque` LEFT JOIN `produto` `p` ON `e`.`idProduto` = `p`.`idProduto` LEFT JOIN `venda_has_produto` `vp` ON `ec`.`idVendaProduto` = `vp`.`idVendaProduto` WHERE "
+      "e.status NOT IN ('CANCELADO', 'QUEBRADO') AND p.fornecedor = '" +
+      fornecedor + "' AND e.codComercial = '" + codComercial + "' GROUP BY `e`.`idEstoque` HAVING restante > 0");
 
-  if (modelEstoque.lastError().isValid()) {
-    emit errorSignal("Erro lendo tabela estoque: " + modelEstoque.lastError().text());
-    return;
-  }
+  if (modelEstoque.lastError().isValid()) { return qApp->enqueueError("Erro lendo tabela estoque: " + modelEstoque.lastError().text(), this); }
 
   modelEstoque.setHeaderData("status", "Status");
   modelEstoque.setHeaderData("idEstoque", "Estoque");
@@ -115,15 +92,18 @@ void ProdutosPendentes::viewProduto(const QString &codComercial, const QString &
   ui->tableEstoque->setModel(&modelEstoque);
   ui->tableEstoque->setItemDelegateForColumn("restante", new DoubleDelegate(this, 3));
 
-  ui->tableEstoque->resizeColumnsToContents();
+  //-----------------------------------------------
+
+  if (modelViewProdutos.rowCount() == 1) { ui->tableProdutos->selectRow(0); }
+  if (modelEstoque.rowCount() == 1) { ui->tableEstoque->selectRow(0); }
 }
 
 void ProdutosPendentes::setupTables() {
   modelProdutos.setTable("venda_has_produto");
-  modelProdutos.setEditStrategy(QSqlTableModel::OnManualSubmit);
+
+  //--------------------------------------------------------------------
 
   modelViewProdutos.setTable("view_produto_pendente");
-  modelViewProdutos.setEditStrategy(QSqlTableModel::OnManualSubmit);
 
   modelViewProdutos.setHeaderData("status", "Status");
   modelViewProdutos.setHeaderData("fornecedor", "Fornecedor");
@@ -142,12 +122,12 @@ void ProdutosPendentes::setupTables() {
   modelViewProdutos.setHeaderData("obs", "Obs.");
 
   ui->tableProdutos->setModel(&modelViewProdutos);
+
   ui->tableProdutos->setItemDelegateForColumn("quant", new DoubleDelegate(this, 3));
   ui->tableProdutos->setItemDelegateForColumn("custo", new ReaisDelegate(this));
+
   ui->tableProdutos->hideColumn("idVendaProduto");
   ui->tableProdutos->hideColumn("idProduto");
-  ui->tableProdutos->hideColumn("idCompra");
-  ui->tableProdutos->resizeColumnsToContents();
 }
 
 bool ProdutosPendentes::comprar(const QModelIndexList &list, const QDate &dataPrevista) {
@@ -159,67 +139,46 @@ bool ProdutosPendentes::comprar(const QModelIndexList &list, const QDate &dataPr
     if (not enviarExcedenteParaCompra(row, dataPrevista)) { return false; }
   }
 
-  if (not modelProdutos.submitAll()) {
-    emit errorSignal("Erro salvando tabela venda_produto: " + modelProdutos.lastError().text());
-    return false;
-  }
-
-  return true;
+  return modelProdutos.submitAll();
 }
 
 void ProdutosPendentes::recarregarTabelas() {
-  if (not modelProdutos.select()) emit errorSignal("Erro recarregando modelProdutos: " + modelProdutos.lastError().text());
-  if (not modelViewProdutos.select()) emit errorSignal("Erro recarregando modelViewProdutos: " + modelViewProdutos.lastError().text());
+  if (not modelProdutos.select()) { return; }
+  if (not modelViewProdutos.select()) { return; }
 
   modelEstoque.setQuery(modelEstoque.query().executedQuery());
 
-  if (modelEstoque.lastError().isValid()) emit errorSignal("Erro recarregando modelEstoque: " + modelEstoque.lastError().text());
+  if (modelEstoque.lastError().isValid()) { return qApp->enqueueError("Erro recarregando modelEstoque: " + modelEstoque.lastError().text(), this); }
 
-  double quant = 0;
+  ui->tableProdutos->clearSelection();
 
-  for (int row = 0; row < modelViewProdutos.rowCount(); ++row) quant += modelViewProdutos.data(row, "quant").toDouble();
-
-  ui->doubleSpinBoxComprar->setMinimum(quant);
-
-  ui->doubleSpinBoxQuantTotal->setValue(quant);
-  ui->doubleSpinBoxComprar->setValue(quant);
-
-  if (modelViewProdutos.rowCount() == 0) close();
+  if (modelViewProdutos.rowCount() == 1) { ui->tableProdutos->selectRow(0); }
+  if (modelViewProdutos.rowCount() == 0) { close(); }
 }
 
 void ProdutosPendentes::on_pushButtonComprar_clicked() {
-  auto list = ui->tableProdutos->selectionModel()->selectedRows();
+  const auto list = ui->tableProdutos->selectionModel()->selectedRows();
 
-  if (list.isEmpty() and modelViewProdutos.rowCount() == 1) list << modelViewProdutos.index(0, 0);
+  if (list.isEmpty()) { return qApp->enqueueError("Nenhum produto selecionado!", this); }
 
-  if (list.isEmpty()) {
-    emit errorSignal("Nenhum produto selecionado!");
-    return;
-  }
+  if (list.size() > 1 and ui->doubleSpinBoxComprar->value() < ui->doubleSpinBoxQuantTotal->value()) { return qApp->enqueueError("Para comprar menos que o total selecione uma linha por vez!", this); }
+
+  if (qFuzzyIsNull(ui->doubleSpinBoxComprar->value())) { return qApp->enqueueError("Quantidade 0!", this); }
 
   const QString idVenda = modelViewProdutos.data(list.first().row(), "idVenda").toString();
 
-  InputDialog inputDlg(InputDialog::Tipo::Carrinho);
+  InputDialog inputDlg(InputDialog::Tipo::Carrinho, this);
   if (inputDlg.exec() != InputDialog::Accepted) { return; }
 
-  emit transactionStarted();
+  if (not qApp->startTransaction()) { return; }
 
-  if (not QSqlQuery("SET SESSION TRANSACTION ISOLATION LEVEL SERIALIZABLE").exec()) { return; }
-  if (not QSqlQuery("START TRANSACTION").exec()) { return; }
-
-  if (not comprar(list, inputDlg.getNextDate())) {
-    QSqlQuery("ROLLBACK").exec();
-    emit transactionEnded();
-    return;
-  }
+  if (not comprar(list, inputDlg.getNextDate())) { return qApp->rollbackTransaction(); }
 
   if (not Sql::updateVendaStatus(idVenda)) { return; }
 
-  if (not QSqlQuery("COMMIT").exec()) { return; }
+  if (not qApp->endTransaction()) { return; }
 
-  emit transactionEnded();
-
-  emit informationSignal("Produto enviado para carrinho!");
+  qApp->enqueueInformation("Produto enviado para carrinho!", this);
 
   recarregarTabelas();
 }
@@ -247,41 +206,24 @@ bool ProdutosPendentes::insere(const QDateTime &dataPrevista) {
   query.bindValue(":codBarras", modelViewProdutos.data(0, "codBarras"));
   query.bindValue(":dataPrevCompra", dataPrevista);
 
-  if (not query.exec()) {
-    emit errorSignal("Erro inserindo dados em pedido_fornecedor_has_produto: " + query.lastError().text());
-    return false;
-  }
+  if (not query.exec()) { return qApp->enqueueError(false, "Erro inserindo dados em pedido_fornecedor_has_produto: " + query.lastError().text(), this); }
 
   return true;
 }
 
-void ProdutosPendentes::on_tableProdutos_entered(const QModelIndex &) { ui->tableProdutos->resizeColumnsToContents(); }
-
 bool ProdutosPendentes::consumirEstoque(const int rowProduto, const int rowEstoque, const double quantConsumir, const double quantVenda) {
-  // TODO: 1pensar em alguma forma de poder consumir compra que nao foi faturado ainda (provavelmente vou restaurar o
-  // processo antigo e sincronizar as tabelas)
-
-  //  const double consumir = qMin(quantEstoque, quantConsumir); // REFAC: 0maybe dont need min, quantConsumir is already limited to quantEstoque
+  // TODO: 1pensar em alguma forma de poder consumir compra que nao foi faturada ainda
 
   auto *estoque = new Estoque(modelEstoque.data(rowEstoque, "idEstoque").toString(), false, this);
   if (not estoque->criarConsumo(modelViewProdutos.data(rowProduto, "idVendaProduto").toInt(), quantConsumir)) { return false; }
 
-  // separar venda se quantidade nao bate
-
   if (quantConsumir < quantVenda) {
-    if (not quebrarVenda(quantConsumir, quantVenda, rowProduto)) { return false; }
+    if (not dividirVenda(quantConsumir, quantVenda, rowProduto)) { return false; }
   }
 
-  // TODO: marcar idCompra no venda_has_produto
-  if (not modelProdutos.setData(rowProduto, "status", modelEstoque.data(rowEstoque, "status").toString())) { return false; }
+  if (not modelProdutos.setData(rowProduto, "status", modelEstoque.data(rowEstoque, "status"))) { return false; }
 
-  // TODO: 0fazer vinculo no pedido_fornecedor (quebrar as linhas)
-
-  // model submit
-  if (not modelProdutos.submitAll()) {
-    emit errorSignal("Erro salvando tabela venda_produto: " + modelProdutos.lastError().text());
-    return false;
-  }
+  if (not modelProdutos.submitAll()) { return false; }
 
   return true;
 }
@@ -289,53 +231,40 @@ bool ProdutosPendentes::consumirEstoque(const int rowProduto, const int rowEstoq
 void ProdutosPendentes::on_pushButtonConsumirEstoque_clicked() {
   const auto listProduto = ui->tableProdutos->selectionModel()->selectedRows();
 
-  if (listProduto.size() > 1) {
-    emit errorSignal("Selecione apenas um item na tabela de produtos!");
-    return;
-  }
+  if (listProduto.size() > 1) { return qApp->enqueueError("Selecione apenas um item na tabela de produtos!", this); }
 
-  if (listProduto.isEmpty()) {
-    emit errorSignal("Nenhum produto selecionado!");
-    return;
-  }
+  if (listProduto.isEmpty()) { return qApp->enqueueError("Nenhum produto selecionado!", this); }
 
   const auto listEstoque = ui->tableEstoque->selectionModel()->selectedRows();
 
-  if ((modelEstoque.rowCount() == 0 or modelEstoque.rowCount() > 1) and listEstoque.isEmpty()) {
-    emit errorSignal("Nenhum estoque selecionado!");
-    return;
-  }
+  if (listEstoque.isEmpty()) { return qApp->enqueueError("Nenhum estoque selecionado!", this); }
 
-  const int rowProduto = listProduto.isEmpty() ? 0 : listProduto.first().row();
-  const int rowEstoque = listEstoque.isEmpty() ? 0 : listEstoque.first().row();
+  const int rowProduto = listProduto.first().row();
+  const int rowEstoque = listEstoque.first().row();
 
   const double quantVenda = modelViewProdutos.data(rowProduto, "quant").toDouble();
   const double quantEstoque = modelEstoque.data(rowEstoque, "restante").toDouble();
 
   bool ok;
-  const double quantConsumir = QInputDialog::getDouble(this, "Consumo", "Quantidade a consumir: ", quantVenda, 0, qMin(quantVenda, quantEstoque), 3, &ok);
+#if QT_VERSION >= QT_VERSION_CHECK(5, 10, 0)
+  const double quantConsumir =
+      QInputDialog::getDouble(this, "Consumo", "Quantidade a consumir: ", quantVenda, 0, qMin(quantVenda, quantEstoque), 3, &ok, Qt::WindowFlags(), ui->doubleSpinBoxComprar->singleStep());
+#else
+  const double quantConsumir = QInputDialog::getDouble(this, "Consumo", "Quantidade a consumir: ", quantVenda, 0, qMin(quantVenda, quantEstoque), 3, &ok, Qt::WindowFlags());
+#endif
   if (not ok) { return; }
 
   const QString idVenda = modelViewProdutos.data(rowProduto, "idVenda").toString();
 
-  emit transactionStarted();
+  if (not qApp->startTransaction()) { return; }
 
-  if (not QSqlQuery("SET SESSION TRANSACTION ISOLATION LEVEL SERIALIZABLE").exec()) { return; }
-  if (not QSqlQuery("START TRANSACTION").exec()) { return; }
-
-  if (not consumirEstoque(rowProduto, rowEstoque, quantConsumir, quantVenda)) {
-    QSqlQuery("ROLLBACK").exec();
-    emit transactionEnded();
-    return;
-  }
+  if (not consumirEstoque(rowProduto, rowEstoque, quantConsumir, quantVenda)) { return qApp->rollbackTransaction(); }
 
   if (not Sql::updateVendaStatus(idVenda)) { return; }
 
-  if (not QSqlQuery("COMMIT").exec()) { return; }
+  if (not qApp->endTransaction()) { return; }
 
-  emit transactionEnded();
-
-  emit informationSignal("Consumo criado com sucesso!");
+  qApp->enqueueInformation("Consumo criado com sucesso!", this);
 
   recarregarTabelas();
 }
@@ -343,9 +272,8 @@ void ProdutosPendentes::on_pushButtonConsumirEstoque_clicked() {
 bool ProdutosPendentes::enviarExcedenteParaCompra(const int row, const QDate &dataPrevista) {
   const double excedente = ui->doubleSpinBoxComprar->value() - ui->doubleSpinBoxQuantTotal->value();
 
-  QSqlQuery query;
-
   if (excedente > 0.) {
+    QSqlQuery query;
     query.prepare("INSERT INTO pedido_fornecedor_has_produto (fornecedor, idProduto, descricao, colecao, quant, un, un2, caixas, prcUnitario, preco, kgcx, formComercial, codComercial, codBarras, "
                   "dataPrevCompra) VALUES (:fornecedor, :idProduto, :descricao, :colecao, :quant, :un, :un2, :caixas, :prcUnitario, :preco, :kgcx, :formComercial, :codComercial, :codBarras, "
                   ":dataPrevCompra)");
@@ -365,10 +293,7 @@ bool ProdutosPendentes::enviarExcedenteParaCompra(const int row, const QDate &da
     query.bindValue(":codBarras", modelViewProdutos.data(row, "codBarras"));
     query.bindValue(":dataPrevCompra", dataPrevista);
 
-    if (not query.exec()) {
-      emit errorSignal("Erro inserindo dados em pedido_fornecedor_has_produto: " + query.lastError().text());
-      return false;
-    }
+    if (not query.exec()) { return qApp->enqueueError(false, "Erro inserindo dados em pedido_fornecedor_has_produto: " + query.lastError().text(), this); }
   }
 
   return true;
@@ -376,8 +301,6 @@ bool ProdutosPendentes::enviarExcedenteParaCompra(const int row, const QDate &da
 
 bool ProdutosPendentes::enviarProdutoParaCompra(const int row, const QDate &dataPrevista) {
   QSqlQuery query;
-
-  // inserir em pedido_fornecedor
   query.prepare("INSERT INTO pedido_fornecedor_has_produto (idVenda, idVendaProduto, fornecedor, idProduto, descricao, obs, colecao, quant, un, un2, caixas, prcUnitario, preco, kgcx, formComercial, "
                 "codComercial, codBarras, dataPrevCompra) VALUES (:idVenda, :idVendaProduto, :fornecedor, :idProduto, :descricao, :obs, :colecao, :quant, :un, :un2, :caixas, :prcUnitario, :preco, "
                 ":kgcx, :formComercial, :codComercial, :codBarras, :dataPrevCompra)");
@@ -388,39 +311,52 @@ bool ProdutosPendentes::enviarProdutoParaCompra(const int row, const QDate &data
   query.bindValue(":descricao", modelViewProdutos.data(row, "produto"));
   query.bindValue(":obs", modelViewProdutos.data(row, "obs"));
   query.bindValue(":colecao", modelViewProdutos.data(row, "colecao"));
-  query.bindValue(":quant", modelViewProdutos.data(row, "quant"));
   query.bindValue(":un", modelViewProdutos.data(row, "un"));
   query.bindValue(":un2", modelViewProdutos.data(row, "un2"));
-  query.bindValue(":caixas", modelViewProdutos.data(row, "quant").toDouble() / ui->doubleSpinBoxQuantTotal->singleStep());
   query.bindValue(":prcUnitario", modelViewProdutos.data(row, "custo").toDouble());
-  query.bindValue(":preco", modelViewProdutos.data(row, "custo").toDouble() * modelViewProdutos.data(row, "quant").toDouble());
   query.bindValue(":kgcx", modelViewProdutos.data(row, "kgcx"));
   query.bindValue(":formComercial", modelViewProdutos.data(row, "formComercial"));
   query.bindValue(":codComercial", modelViewProdutos.data(row, "codComercial"));
   query.bindValue(":codBarras", modelViewProdutos.data(row, "codBarras"));
   query.bindValue(":dataPrevCompra", dataPrevista);
 
-  if (not query.exec()) {
-    emit errorSignal("Erro inserindo dados em pedido_fornecedor_has_produto: " + query.lastError().text());
-    return false;
+  if (ui->doubleSpinBoxComprar->value() < ui->doubleSpinBoxQuantTotal->value()) { // compra avulsa para menos
+    const QDecDouble quant = ui->doubleSpinBoxComprar->value();
+    const QDecDouble custo = modelViewProdutos.data(row, "custo").toDouble();
+    const QDecDouble step = ui->doubleSpinBoxQuantTotal->singleStep();
+
+    query.bindValue(":quant", quant.toDouble());
+    query.bindValue(":preco", (quant * custo).toDouble());
+    query.bindValue(":caixas", (quant / step).toDouble());
+  } else {
+    const QDecDouble quant = modelViewProdutos.data(row, "quant").toDouble();
+    const QDecDouble custo = modelViewProdutos.data(row, "custo").toDouble();
+    const QDecDouble step = ui->doubleSpinBoxQuantTotal->singleStep();
+
+    query.bindValue(":quant", quant.toDouble());
+    query.bindValue(":preco", (quant * custo).toDouble());
+    query.bindValue(":caixas", (quant / step).toDouble());
   }
 
-  return true;
-}
-
-bool ProdutosPendentes::atualizarVenda(const int row) {
-  if (not modelProdutos.setData(row, "status", "INICIADO")) { return false; }
+  if (not query.exec()) { return qApp->enqueueError(false, "Erro inserindo dados em pedido_fornecedor_has_produto: " + query.lastError().text(), this); }
 
   return true;
 }
 
-bool ProdutosPendentes::quebrarVenda(const double quantConsumir, const double quantVenda, const int rowProduto) {
-  // NOTE: quebrar linha de cima em dois para poder comprar a outra parte?
+bool ProdutosPendentes::atualizarVenda(const int rowProduto) {
+  if (ui->doubleSpinBoxComprar->value() < ui->doubleSpinBoxQuantTotal->value()) {
+    if (not dividirVenda(ui->doubleSpinBoxComprar->value(), modelProdutos.data(rowProduto, "quant").toDouble(), rowProduto)) { return false; }
+  }
 
+  if (not modelProdutos.setData(rowProduto, "status", "INICIADO")) { return false; }
+
+  return true;
+}
+
+bool ProdutosPendentes::dividirVenda(const QDecDouble quantSeparar, const QDecDouble quantVenda, const int rowProduto) {
   if (not Log::createLog("idVendaProduto '" + modelProdutos.data(rowProduto, "idVendaProduto").toString() + "': linha dividida para consumo parcial de estoque.")) { return false; }
 
-  const int newRow = modelProdutos.rowCount();
-  modelProdutos.insertRow(newRow);
+  const int newRow = modelProdutos.insertRowAtEnd();
 
   // copiar colunas
   for (int column = 0, columnCount = modelProdutos.columnCount(); column < columnCount; ++column) {
@@ -433,30 +369,31 @@ bool ProdutosPendentes::quebrarVenda(const double quantConsumir, const double qu
     if (not modelProdutos.setData(newRow, column, value)) { return false; }
   }
 
-  const double unCaixa = modelProdutos.data(rowProduto, "unCaixa").toDouble();
+  const QDecDouble unCaixa = modelProdutos.data(rowProduto, "unCaixa").toDouble();
 
-  const double proporcao = quantConsumir / quantVenda;
-  const double parcial = modelProdutos.data(rowProduto, "parcial").toDouble() * proporcao;
-  const double parcialDesc = modelProdutos.data(rowProduto, "parcialDesc").toDouble() * proporcao;
-  const double total = modelProdutos.data(rowProduto, "total").toDouble() * proporcao;
+  const QDecDouble proporcao = quantSeparar / quantVenda;
+  const QDecDouble parcial = QDecDouble(modelProdutos.data(rowProduto, "parcial").toDouble()) * proporcao;
+  const QDecDouble parcialDesc = QDecDouble(modelProdutos.data(rowProduto, "parcialDesc").toDouble()) * proporcao;
+  const QDecDouble total = QDecDouble(modelProdutos.data(rowProduto, "total").toDouble()) * proporcao;
 
-  if (not modelProdutos.setData(rowProduto, "quant", quantConsumir)) { return false; }
-  if (not modelProdutos.setData(rowProduto, "caixas", quantConsumir / unCaixa)) { return false; }
-  if (not modelProdutos.setData(rowProduto, "parcial", parcial)) { return false; }
-  if (not modelProdutos.setData(rowProduto, "parcialDesc", parcialDesc)) { return false; }
-  if (not modelProdutos.setData(rowProduto, "total", total)) { return false; }
+  if (not modelProdutos.setData(rowProduto, "quant", quantSeparar.toDouble())) { return false; }
+  if (not modelProdutos.setData(rowProduto, "caixas", (quantSeparar / unCaixa).toDouble())) { return false; }
+  if (not modelProdutos.setData(rowProduto, "parcial", parcial.toDouble())) { return false; }
+  if (not modelProdutos.setData(rowProduto, "parcialDesc", parcialDesc.toDouble())) { return false; }
+  if (not modelProdutos.setData(rowProduto, "total", total.toDouble())) { return false; }
 
   // alterar quant, precos, etc da linha nova
-  const double proporcaoNovo = (quantVenda - quantConsumir) / quantVenda;
-  const double parcialNovo = modelProdutos.data(newRow, "parcial").toDouble() * proporcaoNovo;
-  const double parcialDescNovo = modelProdutos.data(newRow, "parcialDesc").toDouble() * proporcaoNovo;
-  const double totalNovo = modelProdutos.data(newRow, "total").toDouble() * proporcaoNovo;
+  const QDecDouble proporcaoNovo = (quantVenda - quantSeparar) / quantVenda;
+  const QDecDouble parcialNovo = QDecDouble(modelProdutos.data(newRow, "parcial").toDouble()) * proporcaoNovo;
+  const QDecDouble parcialDescNovo = QDecDouble(modelProdutos.data(newRow, "parcialDesc").toDouble()) * proporcaoNovo;
+  const QDecDouble totalNovo = QDecDouble(modelProdutos.data(newRow, "total").toDouble()) * proporcaoNovo;
 
-  if (not modelProdutos.setData(newRow, "quant", quantVenda - quantConsumir)) { return false; }
-  if (not modelProdutos.setData(newRow, "caixas", (quantVenda - quantConsumir) / unCaixa)) { return false; }
-  if (not modelProdutos.setData(newRow, "parcial", parcialNovo)) { return false; }
-  if (not modelProdutos.setData(newRow, "parcialDesc", parcialDescNovo)) { return false; }
-  if (not modelProdutos.setData(newRow, "total", totalNovo)) { return false; }
+  if (not modelProdutos.setData(newRow, "idRelacionado", modelProdutos.data(rowProduto, "idVendaProduto"))) { return false; }
+  if (not modelProdutos.setData(newRow, "quant", (quantVenda - quantSeparar).toDouble())) { return false; }
+  if (not modelProdutos.setData(newRow, "caixas", ((quantVenda - quantSeparar) / unCaixa).toDouble())) { return false; }
+  if (not modelProdutos.setData(newRow, "parcial", parcialNovo.toDouble())) { return false; }
+  if (not modelProdutos.setData(newRow, "parcialDesc", parcialDescNovo.toDouble())) { return false; }
+  if (not modelProdutos.setData(newRow, "total", totalNovo.toDouble())) { return false; }
 
   return true;
 }

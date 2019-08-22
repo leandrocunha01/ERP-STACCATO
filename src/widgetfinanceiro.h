@@ -1,19 +1,19 @@
-#ifndef WIDGETFINANCEIRO_H
-#define WIDGETFINANCEIRO_H
+#pragma once
 
-#include "widget.h"
+#include <QWidget>
 
 namespace Ui {
 class WidgetFinanceiro;
 }
 
-class WidgetFinanceiro final : public Widget {
+class WidgetFinanceiro final : public QWidget {
   Q_OBJECT
 
 public:
   explicit WidgetFinanceiro(QWidget *parent = nullptr);
   ~WidgetFinanceiro();
-  auto updateTables() -> bool;
+  auto resetTables() -> void;
+  auto updateTables() -> void;
 
 private:
   // attributes
@@ -21,5 +21,3 @@ private:
   // methods
   auto setConnections() -> void;
 };
-
-#endif // WIDGETFINANCEIRO_H

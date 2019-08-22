@@ -1,29 +1,26 @@
-#ifndef XML_VIEWER_H
-#define XML_VIEWER_H
+#pragma once
 
-#include "dialog.h"
-
+#include <QDialog>
 #include <QStandardItemModel>
+
+#include "xml.h"
 
 namespace Ui {
 class XML_Viewer;
 }
 
-class XML_Viewer final : public Dialog {
+class XML_Viewer final : public QDialog {
   Q_OBJECT
 
 public:
-  explicit XML_Viewer(QWidget *parent = nullptr);
+  explicit XML_Viewer(const QByteArray &content, QWidget *parent = nullptr);
   ~XML_Viewer();
-  auto exibirXML(const QByteArray &content) -> void;
 
 private:
   // attributes
-  QByteArray fileContent;
-  QStandardItemModel model;
+  const QByteArray fileContent;
+  XML xml;
   Ui::XML_Viewer *ui;
   // methods
   auto on_pushButtonDanfe_clicked() -> void;
 };
-
-#endif // XML_VIEWER_H

@@ -2,18 +2,19 @@
 #include <QSqlError>
 #include <QSqlRecord>
 
+#include "application.h"
 #include "noeditdelegate.h"
 #include "precoestoque.h"
 #include "reaisdelegate.h"
+#include "sortfilterproxymodel.h"
 #include "ui_precoestoque.h"
 
-PrecoEstoque::PrecoEstoque(QWidget *parent) : Dialog(parent), ui(new Ui::PrecoEstoque) {
+PrecoEstoque::PrecoEstoque(QWidget *parent) : QDialog(parent), ui(new Ui::PrecoEstoque) {
   ui->setupUi(this);
 
   connect(ui->lineEditBusca, &QLineEdit::textChanged, this, &PrecoEstoque::on_lineEditBusca_textChanged);
   connect(ui->pushButtonCancelar, &QPushButton::clicked, this, &PrecoEstoque::on_pushButtonCancelar_clicked);
   connect(ui->pushButtonSalvar, &QPushButton::clicked, this, &PrecoEstoque::on_pushButtonSalvar_clicked);
-  connect(ui->table, &TableView::entered, this, &PrecoEstoque::on_table_entered);
 
   setWindowFlags(Qt::Window);
 
@@ -24,7 +25,6 @@ PrecoEstoque::~PrecoEstoque() { delete ui; }
 
 void PrecoEstoque::setupTables() {
   modelProduto.setTable("produto");
-  modelProduto.setEditStrategy(SqlRelationalTableModel::OnManualSubmit);
 
   modelProduto.setHeaderData("fornecedor", "Fornecedor");
   modelProduto.setHeaderData("descricao", "Descrição");
@@ -46,9 +46,12 @@ void PrecoEstoque::setupTables() {
 
   modelProduto.setFilter("estoque = TRUE AND estoqueRestante > 0");
 
-  if (not modelProduto.select()) emit errorSignal("Erro lendo tabela produto: " + modelProduto.lastError().text());
+  if (not modelProduto.select()) { return; }
+
+  modelProduto.proxyModel = new SortFilterProxyModel(&modelProduto, this);
 
   ui->table->setModel(&modelProduto);
+
   ui->table->hideColumn("idEstoque");
   ui->table->hideColumn("atualizarTabelaPreco");
   ui->table->hideColumn("cfop");
@@ -78,30 +81,26 @@ void PrecoEstoque::setupTables() {
   ui->table->hideColumn("temLote");
 
   for (int column = 0, columnCount = modelProduto.columnCount(); column < columnCount; ++column) {
-    if (modelProduto.record().fieldName(column).endsWith("Upd")) ui->table->setColumnHidden(column, true);
+    if (modelProduto.record().fieldName(column).endsWith("Upd")) { ui->table->setColumnHidden(column, true); }
   }
 
   ui->table->setItemDelegate(new NoEditDelegate(this));
+
   ui->table->setItemDelegateForColumn("precoVenda", new ReaisDelegate(this));
 }
 
 void PrecoEstoque::on_pushButtonSalvar_clicked() {
-  if (not modelProduto.submitAll()) {
-    emit errorSignal("Erro salvando dados: " + modelProduto.lastError().text());
-    return;
-  }
+  if (not modelProduto.submitAll()) { return; }
 
-  emit informationSignal("Dados atualizados!");
+  qApp->enqueueInformation("Dados atualizados!", this);
   close();
 }
 
 void PrecoEstoque::on_pushButtonCancelar_clicked() { close(); }
 
 void PrecoEstoque::on_lineEditBusca_textChanged(const QString &text) {
+  const QString textFiltered = QString(text).replace("-", " ").replace("(", "").replace(")", "");
+
   modelProduto.setFilter(text.isEmpty() ? "estoque = TRUE AND estoqueRestante > 0"
-                                        : "MATCH(fornecedor, descricao, codComercial, colecao) AGAINST('+" + text + "*' IN BOOLEAN MODE) AND estoque = TRUE AND estoqueRestante > 0");
-
-  if (not modelProduto.select()) emit errorSignal("Erro lendo tabela produto: " + modelProduto.lastError().text());
+                                        : "MATCH(fornecedor, descricao, codComercial, colecao) AGAINST('+" + textFiltered + "*' IN BOOLEAN MODE) AND estoque = TRUE AND estoqueRestante > 0");
 }
-
-void PrecoEstoque::on_table_entered(const QModelIndex &) { ui->table->resizeColumnsToContents(); }

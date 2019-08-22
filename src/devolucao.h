@@ -1,16 +1,15 @@
-#ifndef DEVOLUCAO_H
-#define DEVOLUCAO_H
+#pragma once
 
 #include <QDataWidgetMapper>
+#include <QDialog>
 
-#include "dialog.h"
 #include "sqlrelationaltablemodel.h"
 
 namespace Ui {
 class Devolucao;
 }
 
-class Devolucao final : public Dialog {
+class Devolucao final : public QDialog {
   Q_OBJECT
 
 public:
@@ -44,9 +43,6 @@ private:
   auto on_doubleSpinBoxTotalItem_valueChanged(double value) -> void;
   auto on_pushButtonDevolverItem_clicked() -> void;
   auto on_tableProdutos_clicked(const QModelIndex &index) -> void;
-  auto removerVinculoCompra(const int currentRow) -> bool;
   auto salvarCredito() -> bool;
   auto setupTables() -> void;
 };
-
-#endif // DEVOLUCAO_H

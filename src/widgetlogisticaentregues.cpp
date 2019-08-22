@@ -3,97 +3,98 @@
 #include <QSortFilterProxyModel>
 #include <QSqlError>
 
+#include "application.h"
 #include "doubledelegate.h"
+#include "sortfilterproxymodel.h"
 #include "sql.h"
 #include "ui_widgetlogisticaentregues.h"
 #include "usersession.h"
 #include "vendaproxymodel.h"
 #include "widgetlogisticaentregues.h"
 
-WidgetLogisticaEntregues::WidgetLogisticaEntregues(QWidget *parent) : Widget(parent), ui(new Ui::WidgetLogisticaEntregues) {
-  ui->setupUi(this);
-
-  connect(ui->pushButtonCancelar, &QPushButton::clicked, this, &WidgetLogisticaEntregues::on_pushButtonCancelar_clicked);
-  connect(ui->tableVendas, &TableView::clicked, this, &WidgetLogisticaEntregues::on_tableVendas_clicked);
-}
+WidgetLogisticaEntregues::WidgetLogisticaEntregues(QWidget *parent) : QWidget(parent), ui(new Ui::WidgetLogisticaEntregues) { ui->setupUi(this); }
 
 WidgetLogisticaEntregues::~WidgetLogisticaEntregues() { delete ui; }
 
-bool WidgetLogisticaEntregues::updateTables() {
-  if (modelVendas.tableName().isEmpty()) {
+void WidgetLogisticaEntregues::setConnections() {
+  connect(ui->lineEditBusca, &QLineEdit::textChanged, this, &WidgetLogisticaEntregues::montaFiltro);
+  connect(ui->pushButtonCancelar, &QPushButton::clicked, this, &WidgetLogisticaEntregues::on_pushButtonCancelar_clicked);
+  connect(ui->radioButtonEntregaLimpar, &QRadioButton::clicked, this, &WidgetLogisticaEntregues::montaFiltro);
+  connect(ui->radioButtonParcialEntrega, &QRadioButton::clicked, this, &WidgetLogisticaEntregues::montaFiltro);
+  connect(ui->radioButtonSemEntrega, &QRadioButton::clicked, this, &WidgetLogisticaEntregues::montaFiltro);
+  connect(ui->radioButtonTotalEntrega, &QRadioButton::clicked, this, &WidgetLogisticaEntregues::montaFiltro);
+  connect(ui->tableVendas, &TableView::clicked, this, &WidgetLogisticaEntregues::on_tableVendas_clicked);
+}
+
+void WidgetLogisticaEntregues::updateTables() {
+  if (not isSet) {
+    setConnections();
+    isSet = true;
+  }
+
+  if (not modelIsSet) {
     setupTables();
-
-    connect(ui->radioButtonEntregaLimpar, &QRadioButton::clicked, this, &WidgetLogisticaEntregues::montaFiltro);
-    connect(ui->radioButtonParcialEntrega, &QRadioButton::clicked, this, &WidgetLogisticaEntregues::montaFiltro);
-    connect(ui->radioButtonSemEntrega, &QRadioButton::clicked, this, &WidgetLogisticaEntregues::montaFiltro);
-    connect(ui->radioButtonTotalEntrega, &QRadioButton::clicked, this, &WidgetLogisticaEntregues::montaFiltro);
-    connect(ui->lineEditBusca, &QLineEdit::textChanged, this, &WidgetLogisticaEntregues::montaFiltro);
+    montaFiltro();
+    modelIsSet = true;
   }
 
-  if (not modelVendas.select()) {
-    emit errorSignal("Erro lendo tabela vendas: " + modelVendas.lastError().text());
-    return false;
-  }
+  if (not modelVendas.select()) { return; }
 
-  ui->tableVendas->sortByColumn("prazoEntrega");
-
-  ui->tableVendas->resizeColumnsToContents();
+  // -----------------------------------------------------------------
 
   modelProdutos.setQuery(modelProdutos.query().executedQuery());
 
-  if (modelProdutos.lastError().isValid()) {
-    emit errorSignal("Erro lendo tabela produtos: " + modelProdutos.lastError().text());
-    return false;
-  }
-
-  ui->tableProdutos->resizeColumnsToContents();
-
-  return true;
+  if (modelProdutos.lastError().isValid()) { return qApp->enqueueError("Erro lendo tabela produtos: " + modelProdutos.lastError().text(), this); }
 }
 
+void WidgetLogisticaEntregues::resetTables() { modelIsSet = false; }
+
 void WidgetLogisticaEntregues::montaFiltro() {
+  QStringList filtros;
+
   QString filtroCheck;
 
-  if (ui->radioButtonEntregaLimpar->isChecked()) filtroCheck = "";
-  if (ui->radioButtonTotalEntrega->isChecked()) filtroCheck = "Entregue > 0 AND Estoque = 0 AND Outros = 0";
-  if (ui->radioButtonParcialEntrega->isChecked()) filtroCheck = "Entregue > 0 AND (Estoque > 0 OR Outros > 0)";
-  if (ui->radioButtonSemEntrega->isChecked()) filtroCheck = "Entregue = 0";
+  if (ui->radioButtonEntregaLimpar->isChecked()) { filtroCheck = ""; }
+  if (ui->radioButtonTotalEntrega->isChecked()) { filtroCheck = "Entregue > 0 AND Estoque = 0 AND Outros = 0"; }
+  if (ui->radioButtonParcialEntrega->isChecked()) { filtroCheck = "Entregue > 0 AND (Estoque > 0 OR Outros > 0)"; }
+  if (ui->radioButtonSemEntrega->isChecked()) { filtroCheck = "Entregue = 0"; }
+
+  if (not filtroCheck.isEmpty()) { filtros << filtroCheck; }
+
+  //-------------------------------------
 
   const QString textoBusca = ui->lineEditBusca->text();
+  const QString filtroBusca = "idVenda LIKE '%" + textoBusca + "%'";
+  if (not textoBusca.isEmpty()) { filtros << filtroBusca; }
 
-  QString filtroBusca = textoBusca.isEmpty() ? "" : "idVenda LIKE '%" + textoBusca + "%'";
+  //-------------------------------------
 
-  if (not filtroCheck.isEmpty() and not filtroBusca.isEmpty()) filtroBusca.prepend(" AND ");
-
-  modelVendas.setFilter(filtroCheck + filtroBusca);
-
-  ui->tableVendas->resizeColumnsToContents();
+  modelVendas.setFilter(filtros.join(" AND "));
 }
 
 void WidgetLogisticaEntregues::setupTables() {
   modelVendas.setTable("view_entrega");
-  modelVendas.setEditStrategy(QSqlTableModel::OnManualSubmit);
+
+  modelVendas.setSort("prazoEntrega", Qt::AscendingOrder);
 
   modelVendas.setHeaderData("idVenda", "Venda");
   modelVendas.setHeaderData("prazoEntrega", "Prazo Limite");
 
-  ui->tableVendas->setModel(new VendaProxyModel(&modelVendas, this));
-  ui->tableVendas->setItemDelegate(new DoubleDelegate(this));
+  ui->tableVendas->setModel(&modelVendas);
 
-  if (UserSession::tipoUsuario() != "VENDEDOR ESPECIAL") ui->tableVendas->hideColumn("Indicou");
+  ui->tableVendas->setItemDelegate(new DoubleDelegate(this));
 }
 
 void WidgetLogisticaEntregues::on_tableVendas_clicked(const QModelIndex &index) {
+  if (not index.isValid()) { return; }
+
   modelProdutos.setQuery("SELECT `vp`.`idVendaProduto` AS `idVendaProduto`, `vp`.`idProduto` AS `idProduto`, `vp`.`dataPrevEnt` AS `dataPrevEnt`, `vp`.`dataRealEnt` AS `dataRealEnt`, `vp`.`status` "
                          "AS `status`, `vp`.`fornecedor` AS `fornecedor`, `vp`.`idVenda` AS `idVenda`, `vp`.`produto` AS `produto`, `vp`.`caixas` AS `caixas`, `vp`.`quant` AS `quant`, `vp`.`un` AS "
                          "`un`, `vp`.`unCaixa` AS `unCaixa`, `vp`.`codComercial` AS `codComercial`, `vp`.`formComercial` AS `formComercial`, GROUP_CONCAT(DISTINCT`ehc`.`idConsumo`) AS `idConsumo` "
-                         "FROM (`mydb`.`venda_has_produto` `vp` LEFT JOIN `mydb`.`estoque_has_consumo` `ehc` ON ((`vp`.`idVendaProduto` = `ehc`.`idVendaProduto`))) WHERE idVenda = '" +
+                         "FROM (`venda_has_produto` `vp` LEFT JOIN `estoque_has_consumo` `ehc` ON ((`vp`.`idVendaProduto` = `ehc`.`idVendaProduto`))) WHERE idVenda = '" +
                          modelVendas.data(index.row(), "idVenda").toString() + "' GROUP BY `vp`.`idVendaProduto`");
 
-  if (modelProdutos.lastError().isValid()) {
-    emit errorSignal("Erro: " + modelProdutos.lastError().text());
-    return;
-  }
+  if (modelProdutos.lastError().isValid()) { return qApp->enqueueError("Erro: " + modelProdutos.lastError().text(), this); }
 
   modelProdutos.setHeaderData("status", "Status");
   modelProdutos.setHeaderData("fornecedor", "Fornecedor");
@@ -107,31 +108,31 @@ void WidgetLogisticaEntregues::on_tableVendas_clicked(const QModelIndex &index) 
   modelProdutos.setHeaderData("formComercial", "Form. Com.");
   modelProdutos.setHeaderData("dataRealEnt", "Data Ent.");
 
-  auto *proxyFilter = new QSortFilterProxyModel(this);
-  proxyFilter->setDynamicSortFilter(true);
-  proxyFilter->setSourceModel(&modelProdutos);
+  modelProdutos.proxyModel = new SortFilterProxyModel(&modelProdutos, this);
 
-  ui->tableProdutos->setModel(proxyFilter);
+  ui->tableProdutos->setModel(&modelProdutos);
   ui->tableProdutos->hideColumn("idVendaProduto");
   ui->tableProdutos->hideColumn("idProduto");
   ui->tableProdutos->hideColumn("dataPrevEnt");
+  ui->tableProdutos->hideColumn("idConsumo");
 
-  for (int row = 0; row < modelProdutos.rowCount(); ++row) ui->tableProdutos->openPersistentEditor(row, "selecionado");
-
-  ui->tableProdutos->resizeColumnsToContents();
+  ui->tableProdutos->setPersistentColumns({"selecionado"});
 }
 
 void WidgetLogisticaEntregues::on_pushButtonCancelar_clicked() {
   const auto list = ui->tableProdutos->selectionModel()->selectedRows();
 
-  if (list.isEmpty()) {
-    emit errorSignal("Nenhuma linha selecionada!");
-    return;
+  if (list.isEmpty()) { return qApp->enqueueError("Nenhuma linha selecionada!", this); }
+
+  for (const auto &index : list) {
+    const QString status = modelProdutos.data(index.row(), "status").toString();
+
+    if (status != "ENTREGUE") { return qApp->enqueueError("Produto não marcado como 'ENTREGUE'!", this); }
   }
 
   QStringList idVendas;
 
-  for (const auto &index : list) idVendas << modelProdutos.data(index.row(), "idVenda").toString();
+  for (const auto &index : list) { idVendas << modelProdutos.data(index.row(), "idVenda").toString(); }
 
   QMessageBox msgBox(QMessageBox::Question, "Cancelar?", "Tem certeza que deseja cancelar?", QMessageBox::Yes | QMessageBox::No, this);
   msgBox.setButtonText(QMessageBox::Yes, "Cancelar");
@@ -141,48 +142,44 @@ void WidgetLogisticaEntregues::on_pushButtonCancelar_clicked() {
 
   // desfazer passos da confirmacao de entrega (volta para tela de confirmar entrega)
 
-  emit transactionStarted();
+  if (not qApp->startTransaction()) { return; }
 
-  if (not QSqlQuery("SET SESSION TRANSACTION ISOLATION LEVEL SERIALIZABLE").exec()) { return; }
-  if (not QSqlQuery("START TRANSACTION").exec()) { return; }
+  if (not cancelar(list)) { return qApp->rollbackTransaction(); }
 
-  if (not cancelar(list)) {
-    QSqlQuery("ROLLBACK").exec();
-    emit transactionEnded();
-    return;
-  }
+  if (not Sql::updateVendaStatus(idVendas)) { return; }
 
-  if (not Sql::updateVendaStatus(idVendas.join(", "))) { return; }
-
-  if (not QSqlQuery("COMMIT").exec()) { return; }
-
-  emit transactionEnded();
+  if (not qApp->endTransaction()) { return; }
 
   updateTables();
-  emit informationSignal("Entrega cancelada!");
+  qApp->enqueueInformation("Entrega cancelada!", this);
 }
 
 bool WidgetLogisticaEntregues::cancelar(const QModelIndexList &list) {
+  // FIXME: ao voltar vp para ESTOQUE permite que o usuario eventualmente gere outra nota e a primeira vai ficar perdida no limbo
+
   QSqlQuery query1;
   query1.prepare("UPDATE veiculo_has_produto SET status = 'CANCELADO' WHERE idVendaProduto = :idVendaProduto");
 
   QSqlQuery query2;
-  query2.prepare("UPDATE venda_has_produto SET status = 'ESTOQUE', entregou = NULL, recebeu = NULL, dataPrevEnt = NULL, dataRealEnt = NULL WHERE idVendaProduto = :idVendaProduto");
+  query2.prepare("UPDATE venda_has_produto SET status = 'ESTOQUE', entregou = NULL, recebeu = NULL, dataPrevEnt = NULL, dataRealEnt = NULL WHERE idVendaProduto = :idVendaProduto "
+                 "AND status NOT IN ('CANCELADO', 'DEVOLVIDO')");
+
+  QSqlQuery query3;
+  query3.prepare(
+      "UPDATE pedido_fornecedor_has_produto SET status = 'ESTOQUE', dataPrevEnt = NULL, dataRealEnt = NULL WHERE idVendaProduto = :idVendaProduto AND status NOT IN ('CANCELADO', 'DEVOLVIDO')");
 
   for (const auto &item : list) {
     query1.bindValue(":idVendaProduto", modelProdutos.data(item.row(), "idVendaProduto"));
 
-    if (not query1.exec()) {
-      emit errorSignal("Erro atualizando veiculo_produto: " + query1.lastError().text());
-      return false;
-    }
+    if (not query1.exec()) { return qApp->enqueueError(false, "Erro atualizando veiculo_produto: " + query1.lastError().text(), this); }
 
     query2.bindValue(":idVendaProduto", modelProdutos.data(item.row(), "idVendaProduto"));
 
-    if (not query2.exec()) {
-      emit errorSignal("Erro atualizando venda_produto: " + query2.lastError().text());
-      return false;
-    }
+    if (not query2.exec()) { return qApp->enqueueError(false, "Erro atualizando venda_produto: " + query2.lastError().text(), this); }
+
+    query3.bindValue(":idVendaProduto", modelProdutos.data(item.row(), "idVendaProduto"));
+
+    if (not query3.exec()) { return qApp->enqueueError(false, "Erro atualizando pedido_fornecedor: " + query3.lastError().text(), this); }
   }
 
   return true;

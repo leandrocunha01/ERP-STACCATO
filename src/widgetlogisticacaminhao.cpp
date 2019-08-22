@@ -6,57 +6,54 @@
 #include "ui_widgetlogisticacaminhao.h"
 #include "widgetlogisticacaminhao.h"
 
-WidgetLogisticaCaminhao::WidgetLogisticaCaminhao(QWidget *parent) : Widget(parent), ui(new Ui::WidgetLogisticaCaminhao) {
-  ui->setupUi(this);
-
-  connect(ui->table, &TableView::clicked, this, &WidgetLogisticaCaminhao::on_table_clicked);
-  connect(ui->table, &TableView::entered, this, &WidgetLogisticaCaminhao::on_table_entered);
-}
+WidgetLogisticaCaminhao::WidgetLogisticaCaminhao(QWidget *parent) : QWidget(parent), ui(new Ui::WidgetLogisticaCaminhao) { ui->setupUi(this); }
 
 WidgetLogisticaCaminhao::~WidgetLogisticaCaminhao() { delete ui; }
 
+void WidgetLogisticaCaminhao::setConnections() { connect(ui->table, &TableView::clicked, this, &WidgetLogisticaCaminhao::on_table_clicked); }
+
 void WidgetLogisticaCaminhao::setupTables() {
-  // REFAC: refactor this to not select in here
-
   modelCaminhao.setTable("view_caminhao");
-  modelCaminhao.setEditStrategy(QSqlTableModel::OnManualSubmit);
 
-  if (not modelCaminhao.select()) emit errorSignal("Erro lendo tabela caminhâo: " + modelCaminhao.lastError().text());
+  modelCaminhao.setFilter("");
 
   ui->table->setModel(&modelCaminhao);
+
   ui->table->hideColumn("idVeiculo");
 
+  // -----------------------------------------------------------------
+
   modelCarga.setTable("view_caminhao_resumo");
-  modelCarga.setEditStrategy(QSqlTableModel::OnManualSubmit);
 
   modelCarga.setHeaderData("data", "Data");
 
-  modelCarga.setFilter("0");
-
-  if (not modelCarga.select()) emit errorSignal("Erro lendo tabela carga: " + modelCarga.lastError().text());
-
   ui->tableCarga->setModel(&modelCarga);
+
   ui->tableCarga->hideColumn("idVeiculo");
+
   ui->tableCarga->setItemDelegateForColumn("Kg", new DoubleDelegate(this));
 }
 
-bool WidgetLogisticaCaminhao::updateTables() {
-  if (modelCaminhao.tableName().isEmpty()) setupTables();
-
-  if (not modelCaminhao.select()) {
-    emit errorSignal("Erro lendo tabela caminhão: " + modelCaminhao.lastError().text());
-    return false;
+void WidgetLogisticaCaminhao::updateTables() {
+  if (not isSet) {
+    setConnections();
+    isSet = true;
   }
 
-  ui->table->resizeColumnsToContents();
+  if (not modelIsSet) {
+    setupTables();
+    modelIsSet = true;
+  }
 
-  return true;
+  if (not modelCaminhao.select()) { return; }
+
+  if (not modelCarga.select()) { return; }
 }
 
-void WidgetLogisticaCaminhao::on_table_entered(const QModelIndex &) { ui->table->resizeColumnsToContents(); }
+void WidgetLogisticaCaminhao::resetTables() { modelIsSet = false; }
 
 void WidgetLogisticaCaminhao::on_table_clicked(const QModelIndex &index) {
-  modelCarga.setFilter("idVeiculo = " + modelCaminhao.data(index.row(), "idVeiculo").toString());
+  if (not index.isValid()) { return; }
 
-  if (not modelCarga.select()) emit errorSignal("Erro lendo tabela carga: " + modelCarga.lastError().text());
+  modelCarga.setFilter("idVeiculo = " + modelCaminhao.data(index.row(), "idVeiculo").toString() + " ORDER BY data DESC");
 }

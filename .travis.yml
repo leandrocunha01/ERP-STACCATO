@@ -1,41 +1,32 @@
 language: cpp
 compiler: gcc
-sudo: required
-dist: trusty
+dist: bionic
 
 before_install:
   - echo -n | openssl s_client -connect https://scan.coverity.com:443 | sed -ne '/-BEGIN CERTIFICATE-/,/-END CERTIFICATE-/p' | sudo tee -a /etc/ssl/certs/ca-
-  - sudo add-apt-repository ppa:beineri/opt-qt-5.10.1-trusty -y
-  - sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
-  - sudo apt-get update
 
-install:
-  - sudo apt-get install g++-7 gcc-7
-  - sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-7 90
-  - sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-7 90
-  - "sudo apt-get install dh-make freetds-common libbluetooth3 libegl1-mesa-drivers libmng2 libmtdev1
-  libopenal-data libopenal1 libopenvg1-mesa libopus0 libsdl2-2.0-0 libsnappy1
-  libsybdb5 libwayland-egl1-mesa libwebp5 libwebpdemux1 libxcb-icccm4
-  libxcb-image0 libxcb-keysyms1 libxcb-render-util0 libxcb-xinerama0 qt510base
-  qt510connectivity qt510gamepad qt510graphicaleffects qt510imageformats 
-  qt510location qt510multimedia qt510quickcontrols qt510quickcontrols2 
-  qt510remoteobjects qt510script qt510scxml qt510sensors qt510serialbus 
-  qt510serialport qt510speech qt510svg qt510tools qt510translations 
-  qt510webchannel qt510websockets qt510x11extras qt510xmlpatterns qt510charts-no-lgpl"
-  
 addons:
+  apt:
+    sources:
+    - sourceline: 'ppa:ubuntu-toolchain-r/test'
+    - sourceline: 'ppa:beineri/opt-qt-5.12.3-bionic'
+    packages:
+    - gcc-9
+    - g++-9
+    - qt512base
+    - qt512charts-no-lgpl
+    - qt512script
+    - qt512tools
+    - mesa-common-dev
+    - libgl1-mesa-dev
+    
   coverity_scan:
     project:
       name: "darktorres/ERP-STACCATO"
       description: "ERP-STACCATO"
     notification_email: torres.dark@gmail.com
-    build_command_prepend: "source /opt/qt510/bin/qt510-env.sh && /opt/qt510/bin/qmake Loja.pro"
-    build_command: "make -j3"
+    build_command_prepend: "source /opt/qt512/bin/qt512-env.sh && /opt/qt512/bin/qmake Loja.pro"
+    build_command: "make -j2"
     branch_pattern: coverity_scan
     
-script: if [ "${COVERITY_SCAN_BRANCH}" != 1 ]; then source /opt/qt510/bin/qt510-env.sh && /opt/qt510/bin/qmake Loja.pro && make -j3 ; fi
-  
-  # TODO:
-  # cache ccache cache folder?
-  # cache /usr/bin
-  # cache qt folder /opt/qt?
+script: if [ "${COVERITY_SCAN_BRANCH}" != 1 ]; then source /opt/qt512/bin/qt512-env.sh && /opt/qt512/bin/qmake Loja.pro && make -j2 ; fi

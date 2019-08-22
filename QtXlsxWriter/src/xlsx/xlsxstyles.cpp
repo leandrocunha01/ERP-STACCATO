@@ -82,9 +82,7 @@ Format Styles::dxfFormat(int idx) const {
 void Styles::fixNumFmt(const Format &format) {
   if (not format.hasNumFmtData()) return;
 
-  if (format.hasProperty(FormatPrivate::P_NumFmt_Id) and not format.stringProperty(FormatPrivate::P_NumFmt_FormatCode).isEmpty()) {
-    return;
-  }
+  if (format.hasProperty(FormatPrivate::P_NumFmt_Id) and not format.stringProperty(FormatPrivate::P_NumFmt_FormatCode).isEmpty()) { return; }
 
   if (m_builtinNumFmtsHash.isEmpty()) {
     m_builtinNumFmtsHash.insert(QStringLiteral("General"), 0);
@@ -545,48 +543,24 @@ void Styles::writeCellXfs(QXmlStreamWriter &writer) const {
       writer.writeEmptyElement(QStringLiteral("alignment"));
       if (format.hasProperty(FormatPrivate::P_Alignment_AlignH)) {
         switch (format.horizontalAlignment()) {
-        case Format::AlignLeft:
-          writer.writeAttribute(QStringLiteral("horizontal"), QStringLiteral("left"));
-          break;
-        case Format::AlignHCenter:
-          writer.writeAttribute(QStringLiteral("horizontal"), QStringLiteral("center"));
-          break;
-        case Format::AlignRight:
-          writer.writeAttribute(QStringLiteral("horizontal"), QStringLiteral("right"));
-          break;
-        case Format::AlignHFill:
-          writer.writeAttribute(QStringLiteral("horizontal"), QStringLiteral("fill"));
-          break;
-        case Format::AlignHJustify:
-          writer.writeAttribute(QStringLiteral("horizontal"), QStringLiteral("justify"));
-          break;
-        case Format::AlignHMerge:
-          writer.writeAttribute(QStringLiteral("horizontal"), QStringLiteral("centerContinuous"));
-          break;
-        case Format::AlignHDistributed:
-          writer.writeAttribute(QStringLiteral("horizontal"), QStringLiteral("distributed"));
-          break;
-        default:
-          break;
+        case Format::AlignLeft: writer.writeAttribute(QStringLiteral("horizontal"), QStringLiteral("left")); break;
+        case Format::AlignHCenter: writer.writeAttribute(QStringLiteral("horizontal"), QStringLiteral("center")); break;
+        case Format::AlignRight: writer.writeAttribute(QStringLiteral("horizontal"), QStringLiteral("right")); break;
+        case Format::AlignHFill: writer.writeAttribute(QStringLiteral("horizontal"), QStringLiteral("fill")); break;
+        case Format::AlignHJustify: writer.writeAttribute(QStringLiteral("horizontal"), QStringLiteral("justify")); break;
+        case Format::AlignHMerge: writer.writeAttribute(QStringLiteral("horizontal"), QStringLiteral("centerContinuous")); break;
+        case Format::AlignHDistributed: writer.writeAttribute(QStringLiteral("horizontal"), QStringLiteral("distributed")); break;
+        default: break;
         }
       }
 
       if (format.hasProperty(FormatPrivate::P_Alignment_AlignV)) {
         switch (format.verticalAlignment()) {
-        case Format::AlignTop:
-          writer.writeAttribute(QStringLiteral("vertical"), QStringLiteral("top"));
-          break;
-        case Format::AlignVCenter:
-          writer.writeAttribute(QStringLiteral("vertical"), QStringLiteral("center"));
-          break;
-        case Format::AlignVJustify:
-          writer.writeAttribute(QStringLiteral("vertical"), QStringLiteral("justify"));
-          break;
-        case Format::AlignVDistributed:
-          writer.writeAttribute(QStringLiteral("vertical"), QStringLiteral("distributed"));
-          break;
-        default:
-          break;
+        case Format::AlignTop: writer.writeAttribute(QStringLiteral("vertical"), QStringLiteral("top")); break;
+        case Format::AlignVCenter: writer.writeAttribute(QStringLiteral("vertical"), QStringLiteral("center")); break;
+        case Format::AlignVJustify: writer.writeAttribute(QStringLiteral("vertical"), QStringLiteral("justify")); break;
+        case Format::AlignVDistributed: writer.writeAttribute(QStringLiteral("vertical"), QStringLiteral("distributed")); break;
+        default: break;
         }
       }
       if (format.hasProperty(FormatPrivate::P_Alignment_Indent)) writer.writeAttribute(QStringLiteral("indent"), QString::number(format.indent()));
@@ -1182,9 +1156,7 @@ bool Styles::loadFromXmlFile(QIODevice *device) {
       }
     }
 
-    if (reader.hasError()) {
-      qDebug() << "Error when read style file: " << reader.errorString();
-    }
+    if (reader.hasError()) { qDebug() << "Error when read style file: " << reader.errorString(); }
   }
   return true;
 }

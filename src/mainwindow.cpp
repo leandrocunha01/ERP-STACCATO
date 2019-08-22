@@ -1,12 +1,7 @@
-#include <QDate>
-#include <QDebug>
 #include <QDesktopServices>
 #include <QMessageBox>
 #include <QShortcut>
 #include <QSqlError>
-#include <QStyleFactory>
-#include <QUrl>
-#include <cmath>
 
 #include "application.h"
 #include "cadastrocliente.h"
@@ -26,10 +21,10 @@
 #include "usersession.h"
 #include "xlsxdocument.h"
 
-// QT_CHARTS_USE_NAMESPACE
-
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWindow) {
   ui->setupUi(this);
+
+  connect(qApp, &Application::verifyDb, this, &MainWindow::verifyDb);
 
   connect(ui->actionCadastrarCliente, &QAction::triggered, this, &MainWindow::on_actionCadastrarCliente_triggered);
   connect(ui->actionCadastrarFornecedor, &QAction::triggered, this, &MainWindow::on_actionCadastrarFornecedor_triggered);
@@ -57,226 +52,78 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
   QShortcut *shortcut = new QShortcut(QKeySequence(Qt::CTRL + Qt::Key_Q), this);
   connect(shortcut, &QShortcut::activated, this, &QWidget::close);
 
-  const auto hostname = UserSession::getSetting("Login/hostname");
+  if (const auto hostname = UserSession::getSetting("Login/hostname"); hostname) {
+    const QString hostnameText = qApp->getMapLojas().key(hostname.value().toString());
 
-  if (not hostname) {
-    QMessageBox::critical(nullptr, "Erro!", "A chave 'hostname' não está configurada!");
-    return;
+    setWindowTitle(windowTitle() + " - " + UserSession::nome() + " - " + UserSession::tipoUsuario() + " - " + (hostnameText.isEmpty() ? hostname.value().toString() : hostnameText));
+  } else {
+    qApp->enqueueError("A chave 'hostname' não está configurada!", this);
   }
 
-  const QString hostnameText = qApp->getMapLojas().key(hostname.value().toString());
-
-  setWindowTitle(windowTitle() + " - " + UserSession::nome() + " - " + UserSession::tipoUsuario() + " - " + (hostnameText.isEmpty() ? hostname.value().toString() : hostnameText));
-
-  if (UserSession::tipoUsuario() != "ADMINISTRADOR" and UserSession::tipoUsuario() != "GERENTE LOJA") {
+  if (UserSession::tipoUsuario() != "ADMINISTRADOR") {
+    ui->actionCadastrarFornecedor->setDisabled(true);
+    ui->actionCadastrarProdutos->setDisabled(true);
+    ui->actionCadastrarUsuario->setDisabled(true);
     ui->actionGerenciar_Lojas->setDisabled(true);
     ui->actionGerenciar_Transportadoras->setDisabled(true);
-    ui->menuImportar_tabela_fornecedor->setDisabled(true);
-    ui->actionCadastrarUsuario->setDisabled(true);
-    ui->actionCadastrarProfissional->setDisabled(true);
-    ui->actionCadastrarFornecedor->setDisabled(true);
     ui->actionGerenciar_preco_estoque->setDisabled(true);
+    ui->actionProdutos->setDisabled(true);
+    ui->menuImportar_tabela_fornecedor->setDisabled(true);
   }
 
-  //
+  // -------------------------------------------------------------------------
 
   QSqlQuery query;
   query.prepare("SELECT * FROM usuario_has_permissao WHERE idUsuario = :idUsuario");
   query.bindValue(":idUsuario", UserSession::idUsuario());
 
-  if (not query.exec() or not query.first()) QMessageBox::critical(this, "Erro!", "Erro lendo permissões: " + query.lastError().text());
+  if (query.exec() and query.first()) {
+    // REFAC: dont harcode numbers
+    ui->tabWidget->setTabEnabled(0, query.value("view_tab_orcamento").toBool());
+    ui->tabWidget->setTabEnabled(1, query.value("view_tab_venda").toBool());
+    ui->tabWidget->setTabEnabled(2, query.value("view_tab_compra").toBool());
+    ui->tabWidget->setTabEnabled(3, query.value("view_tab_logistica").toBool());
+    ui->tabWidget->setTabEnabled(4, query.value("view_tab_nfe").toBool());
+    ui->tabWidget->setTabEnabled(5, query.value("view_tab_estoque").toBool());
+    ui->tabWidget->setTabEnabled(6, query.value("view_tab_financeiro").toBool());
+    ui->tabWidget->setTabEnabled(7, query.value("view_tab_relatorio").toBool());
+  } else {
+    qApp->enqueueError("Erro lendo permissões: " + query.lastError().text(), this);
+  }
 
-  // REFAC: dont harcode numbers
-  ui->tabWidget->setTabEnabled(0, query.value("view_tab_orcamento").toBool());
-  ui->tabWidget->setTabEnabled(1, query.value("view_tab_venda").toBool());
-  ui->tabWidget->setTabEnabled(2, query.value("view_tab_compra").toBool());
-  ui->tabWidget->setTabEnabled(3, query.value("view_tab_logistica").toBool());
-  ui->tabWidget->setTabEnabled(4, query.value("view_tab_nfe").toBool());
-  ui->tabWidget->setTabEnabled(5, query.value("view_tab_estoque").toBool());
-  ui->tabWidget->setTabEnabled(6, query.value("view_tab_financeiro").toBool());
-  ui->tabWidget->setTabEnabled(7, query.value("view_tab_relatorio").toBool());
-
-  //
-
-  ui->tabWidget->setTabEnabled(8, false);
-
-  //
+  // -------------------------------------------------------------------------
 
   pushButtonStatus = new QPushButton(this);
   pushButtonStatus->setIcon(QIcon(":/reconnect.png"));
   pushButtonStatus->setText("Conectado: " + UserSession::getSetting("Login/hostname").value().toString());
-  pushButtonStatus->setStyleSheet("color: rgb(0, 255, 0);");
+  pushButtonStatus->setStyleSheet("color: rgb(0, 190, 0);");
 
   ui->statusBar->addWidget(pushButtonStatus);
 
-  connect(pushButtonStatus, &QPushButton::clicked, this, &MainWindow::verifyDb);
+  connect(pushButtonStatus, &QPushButton::clicked, this, &MainWindow::reconnectDb);
 
-  //  QSqlQuery queryChart;
+  //---------------------------------------------------------------------------
 
-  //  qDebug() << queryChart.exec("SELECT * FROM view_relatorio_temp");
+  ui->tabWidget->setTabEnabled(8, false); // graficos
 
-  //  int dia = 1;
+  const QString nomeUsuario = UserSession::nome();
 
-  //  QLineSeries *seriesJan = new QLineSeries();
-  //  QLineSeries *seriesFev = new QLineSeries();
-  //  QLineSeries *seriesMar = new QLineSeries();
-
-  //  while (queryChart.next()) {
-
-  //    seriesJan->append(dia, queryChart.value("jan").toDouble());
-  //    seriesFev->append(dia, queryChart.value("fev").toDouble());
-  //    seriesMar->append(dia, queryChart.value("mar").toDouble());
-
-  //    dia++;
-  //  }
-
-  //  QChart *chart = new QChart();
-  //  chart->legend()->hide();
-  //  chart->addSeries(seriesJan);
-  //  chart->addSeries(seriesFev);
-  //  chart->addSeries(seriesMar);
-  //  chart->createDefaultAxes();
-  //  chart->setTitle("Simple line chart example");
-
-  //  QChartView *chartView = new QChartView(chart);
-  //  chartView->setRenderHint(QPainter::Antialiasing);
-
-  //  ui->tabWidget->widget(8)->layout()->addWidget(chartView);
-
-  // NOTE: fazer o mes atual ate o dia corrente
-  // fazer o mes atual com a linha em bold
-  // fazer o mesmo mes do ano anterior em bold
-  // fazer uma linha diferente com a media
-
-  //  gerarEnviarRelatorio();
+  if (nomeUsuario == "ADMINISTRADOR" or nomeUsuario == "EDUARDO OLIVEIRA" or nomeUsuario == "GISELY OLIVEIRA") { ui->tabWidget->setTabEnabled(8, true); }
 }
 
 MainWindow::~MainWindow() { delete ui; }
 
-void MainWindow::verifyDb() {
-  const bool conectado = qApp->dbConnect();
+void MainWindow::reconnectDb() {
+  const bool conectado = qApp->dbReconnect();
 
-  pushButtonStatus->setText(conectado ? "Conectado: " + UserSession::getSetting("Login/hostname").value().toString() : "Desconectado");
-  pushButtonStatus->setStyleSheet(conectado ? "color: rgb(0, 255, 0);" : "color: rgb(255, 0, 0);");
-
-  if (conectado) updateTables();
+  verifyDb(conectado);
 }
 
-// REFAC: put this in a class
-void MainWindow::gerarEnviarRelatorio() {
-  // REFAC: 0finish
-  // verificar em que etapa eu guardo a linha do dia seguinte no BD
+void MainWindow::verifyDb(const bool conectado) {
+  pushButtonStatus->setText(conectado ? "Conectado: " + UserSession::getSetting("Login/hostname").value().toString() : "Desconectado");
+  pushButtonStatus->setStyleSheet(conectado ? "color: rgb(0, 190, 0);" : "color: rgb(255, 0, 0);");
 
-  QSqlQuery query;
-  // TODO: replace *
-  query.prepare("SELECT * FROM jobs WHERE dataReferente = :dataReferente AND status = 'PENDENTE'");
-  query.bindValue(":dataAgendado", QDate::currentDate());
-
-  if (not query.exec()) {
-    QMessageBox::critical(this, "Erro!", "Erro buscando relatórios agendados: " + query.lastError().text());
-    return;
-  }
-
-  while (query.next()) {
-    const QString relatorioPagar = "C:/temp/pagar.xlsx";     // guardar direto no servidor?
-    const QString relatorioReceber = "C:/temp/receber.xlsx"; // e se o computador nao tiver o servidor mapeado?
-
-    //
-
-    QXlsx::Document xlsxPagar(relatorioPagar);
-
-    //    xlsx.currentWorksheet()->setFitToPage(true);
-    //    xlsx.currentWorksheet()->setFitToHeight(true);
-    //    xlsx.currentWorksheet()->setOrientationVertical(false);
-
-    QSqlQuery queryView;
-
-    if (not queryView.exec("SELECT * FROM view_relatorio_pagar")) {
-      QMessageBox::critical(this, "Erro!", "Erro lendo relatorio pagar: " + queryView.lastError().text());
-      return;
-    }
-
-    xlsxPagar.write("A1", "Data Emissão");
-    xlsxPagar.write("B1", "Data Realizado");
-    xlsxPagar.write("C1", "Valor R$");
-    xlsxPagar.write("D1", "Conta");
-    xlsxPagar.write("E1", "Obs.");
-    xlsxPagar.write("F1", "Contraparte");
-    xlsxPagar.write("G1", "Grupo");
-    xlsxPagar.write("H1", "Subgrupo");
-
-    int row = 1;
-
-    while (queryView.next()) {
-      xlsxPagar.write("A" + QString::number(row), queryView.value("dataEmissao"));
-      xlsxPagar.write("B" + QString::number(row), queryView.value("dataRealizado"));
-      xlsxPagar.write("C" + QString::number(row), queryView.value("valorReal"));
-      xlsxPagar.write("D" + QString::number(row), queryView.value("Conta"));
-      xlsxPagar.write("E" + QString::number(row), queryView.value("observacao"));
-      xlsxPagar.write("F" + QString::number(row), queryView.value("contraParte"));
-      xlsxPagar.write("G" + QString::number(row), queryView.value("grupo"));
-      xlsxPagar.write("H" + QString::number(row), queryView.value("subGrupo"));
-
-      ++row;
-    }
-
-    //
-
-    QXlsx::Document xlsxReceber(relatorioReceber);
-
-    //    xlsx.currentWorksheet()->setFitToPage(true);
-    //    xlsx.currentWorksheet()->setFitToHeight(true);
-    //    xlsx.currentWorksheet()->setOrientationVertical(false);
-
-    if (not queryView.exec("SELECT * FROM view_relatorio_receber")) {
-      QMessageBox::critical(this, "Erro!", "Erro lendo relatorio receber: " + queryView.lastError().text());
-      return;
-    }
-
-    xlsxReceber.write("A1", "dataEmissao");
-    xlsxReceber.write("B1", "dataRealizado");
-    xlsxReceber.write("C1", "valorReal");
-    xlsxReceber.write("D1", "Conta");
-    xlsxReceber.write("E1", "observacao");
-    xlsxReceber.write("F1", "contraParte");
-    xlsxReceber.write("G1", "grupo");
-    xlsxReceber.write("H1", "subGrupo");
-
-    row = 1;
-
-    while (queryView.next()) {
-      xlsxReceber.write("A" + QString::number(row), queryView.value("dataEmissao"));
-      xlsxReceber.write("B" + QString::number(row), queryView.value("dataRealizado"));
-      xlsxReceber.write("C" + QString::number(row), queryView.value("valorReal"));
-      xlsxReceber.write("D" + QString::number(row), queryView.value("Conta"));
-      xlsxReceber.write("E" + QString::number(row), queryView.value("observacao"));
-      xlsxReceber.write("F" + QString::number(row), queryView.value("contraParte"));
-      xlsxReceber.write("G" + QString::number(row), queryView.value("grupo"));
-      xlsxReceber.write("H" + QString::number(row), queryView.value("subGrupo"));
-
-      ++row;
-    }
-
-    //
-
-    QSqlQuery query2;
-    query2.prepare("INSERT INTO jobs (dataEnviado, dataReferente, status) VALUES (:dataEnviado, :dataReferente, 'ENVIADO')");
-
-    const int diaSemana = QDate::currentDate().dayOfWeek();
-
-    query2.bindValue(":dataReferente", QDate::currentDate().addDays(diaSemana < 4 ? 5 : diaSemana - 3));
-    query2.bindValue(":dataEnviado", QDate::currentDate());
-
-    if (not query2.exec()) {
-      QMessageBox::critical(this, "Erro!", "Erro guardando relatórios financeiro: " + query2.lastError().text());
-      return;
-    }
-
-    //    SendMail *mail = new SendMail(this, anexo, fornecedor);
-    //    mail->setAttribute(Qt::WA_DeleteOnClose);
-
-    //    mail->exec();
-  }
+  if (conectado) { resetTables(); }
 }
 
 void MainWindow::on_actionCriarOrcamento_triggered() {
@@ -321,6 +168,20 @@ void MainWindow::on_actionGerenciar_Lojas_triggered() {
   cad->show();
 }
 
+void MainWindow::resetTables() {
+  ui->widgetOrcamento->resetTables();
+  ui->widgetVenda->resetTables();
+  ui->widgetCompra->resetTables();
+  ui->widgetLogistica->resetTables();
+  ui->widgetNfe->resetTables();
+  ui->widgetEstoque->resetTables();
+  ui->widgetFinanceiro->resetTables();
+  ui->widgetRelatorio->resetTables();
+  ui->widgetGraficos->resetTables();
+
+  updateTables();
+}
+
 void MainWindow::updateTables() {
   if (qApp->getUpdating()) { return; }
   if (not qApp->getIsConnected()) { return; }
@@ -330,14 +191,15 @@ void MainWindow::updateTables() {
 
   const QString currentText = ui->tabWidget->tabText(ui->tabWidget->currentIndex());
 
-  if (currentText == "Orçamentos") ui->widgetOrcamento->updateTables();
-  if (currentText == "Vendas") ui->widgetVenda->updateTables();
-  if (currentText == "Compras") ui->widgetCompra->updateTables();
-  if (currentText == "Logística") ui->widgetLogistica->updateTables();
-  if (currentText == "NFe") ui->widgetNfe->updateTables();
-  if (currentText == "Estoque") ui->widgetEstoque->updateTables();
-  if (currentText == "Financeiro") ui->widgetFinanceiro->updateTables();
-  if (currentText == "Relatórios") ui->widgetRelatorio->updateTables();
+  if (currentText == "Orçamentos") { ui->widgetOrcamento->updateTables(); }
+  if (currentText == "Vendas") { ui->widgetVenda->updateTables(); }
+  if (currentText == "Compras") { ui->widgetCompra->updateTables(); }
+  if (currentText == "Logística") { ui->widgetLogistica->updateTables(); }
+  if (currentText == "NFe") { ui->widgetNfe->updateTables(); }
+  if (currentText == "Estoque") { ui->widgetEstoque->updateTables(); }
+  if (currentText == "Financeiro") { ui->widgetFinanceiro->updateTables(); }
+  if (currentText == "Relatórios") { ui->widgetRelatorio->updateTables(); }
+  if (currentText == "Gráfico") { ui->widgetGraficos->updateTables(); }
 
   qApp->setUpdating(false);
 }
@@ -350,12 +212,9 @@ void MainWindow::on_actionCadastrarFornecedor_triggered() {
 
 bool MainWindow::event(QEvent *event) {
   switch (event->type()) {
-  case QEvent::WindowActivate:
-    updateTables();
-    break;
+  case QEvent::WindowActivate: updateTables(); break;
 
-  default:
-    break;
+  default: break;
   }
 
   return QMainWindow::event(event);
@@ -380,28 +239,22 @@ void MainWindow::on_actionConfiguracoes_triggered() {
 void MainWindow::on_actionCalculadora_triggered() { QDesktopServices::openUrl(QUrl::fromLocalFile(R"(C:\Windows\System32\calc.exe)")); }
 
 void MainWindow::on_actionProdutos_triggered() {
-  auto *importa = new ImportaProdutos(this);
+  auto *importa = new ImportaProdutos(ImportaProdutos::Tipo::Produto, this);
   importa->setAttribute(Qt::WA_DeleteOnClose);
-  importa->importarProduto();
+  importa->importarTabela();
 }
 
 void MainWindow::on_actionEstoque_triggered() {
-  auto *importa = new ImportaProdutos(this);
+  auto *importa = new ImportaProdutos(ImportaProdutos::Tipo::Estoque, this);
   importa->setAttribute(Qt::WA_DeleteOnClose);
-  importa->importarEstoque();
+  importa->importarTabela();
 }
 
 void MainWindow::on_actionPromocao_triggered() {
-  auto *importa = new ImportaProdutos(this);
+  auto *importa = new ImportaProdutos(ImportaProdutos::Tipo::Promocao, this);
   importa->setAttribute(Qt::WA_DeleteOnClose);
-  importa->importarPromocao();
+  importa->importarTabela();
 }
-
-// TODO: 0montar relatorio dos caminhoes com graficos e total semanal, mensal, custos etc
-// NOTE: colocar logo da staccato na mainwindow
-
-// NOTE: prioridades atuais:
-// TODO: logistica da devolucao
 
 void MainWindow::on_actionGerenciar_preco_estoque_triggered() {
   auto *estoque = new PrecoEstoque(this);
@@ -414,6 +267,12 @@ void MainWindow::on_actionCalcular_frete_triggered() {
   frete->setAttribute(Qt::WA_DeleteOnClose);
   frete->show();
 }
+
+// TODO: 0montar relatorio dos caminhoes com graficos e total semanal, mensal, custos etc
+// NOTE: colocar logo da staccato na mainwindow
+
+// NOTE: prioridades atuais:
+// TODO: logistica da devolucao
 
 // TASK: cancelamento de nfe: terminar de arrumar formato do email
 // TASK: arrumar cadastrarNFe para quando guardar a nota pendente associar ela com venda_has_produto para aparecer na tela de consultarNFe (depois disso só vai precisar atualizar a nota com a
@@ -442,12 +301,5 @@ void MainWindow::on_actionCalcular_frete_triggered() {
 // TASK: terminar de implantar quebra/reposicao
 // TASK: reimportar notas do pedido 172646
 // TODO: na reposicao concatenar '(REPOSICAO)' no comeco da descricao do produto
-// REFAC: make a code that checks if the program is inside a transaction and if it is it postpones showing error messages
 // TODO: diff defaultPalette and darkPalette to find the stuff that is missing implementing
-// TODO: verificar no banco de dados as tabelas que usam coluna 'caixas', tem varias linhas com casas decimais (4.999999999), verificar os calculos
-
-// NOTE: *quebralinha venda_produto/pedido_fornecedor
-// *compra/consumo parcial
-// *agendamento parcial
-// *devolucao (separar no pf em 2 linhas, uma mantem o vinculo da parte que foi entregue e a outra fica sem vinculo da porte que foi devolvida)
-// *quebra/reposicao
+// NOTE: add logging everywhere so when the need for debugging on the client pc arises it can be run from the terminal to see the logs

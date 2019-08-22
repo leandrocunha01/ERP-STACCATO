@@ -16,8 +16,12 @@ WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEM
 COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
 OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.*/
 
+#include <QFile>
+#include <QFileInfo>
+#include <QMessageBox>
 #include <QResource>
 
+#include "application.h"
 #include "smtp.h"
 
 Smtp::Smtp(const QString &user, const QString &pass, const QString &host, const quint16 port, const int timeout) : timeout(timeout), host(host), pass(pass), user(user), port(port) {
@@ -25,12 +29,15 @@ Smtp::Smtp(const QString &user, const QString &pass, const QString &host, const 
 
   connect(socket, &QIODevice::readyRead, this, &Smtp::readyRead);
   connect(socket, &QAbstractSocket::connected, this, &Smtp::connected);
-  connect(socket, QOverload<QAbstractSocket::SocketError>::of(&QAbstractSocket::error), this, &Smtp::errorReceived);
+  connect(socket, qOverload<QAbstractSocket::SocketError>(&QAbstractSocket::error), this, &Smtp::errorReceived);
   connect(socket, &QAbstractSocket::stateChanged, this, &Smtp::stateChanged);
   connect(socket, &QAbstractSocket::disconnected, this, &Smtp::disconnected);
 }
 
-void Smtp::sendMail(const QString &from, const QString &to, const QString &cc, const QString &subject, const QString &body, const QStringList &files, const QString &assinatura) {
+void Smtp::sendMail(const QString &from, const QString &to, const QString &cc, const QString &subject, const QString &body, const QStringList &files,
+                    const QString &assinatura) { // FIXME: shadows //TODO: V688 http://www.viva64.com/en/V688 The 'from' function argument possesses the same name as one of the class members, which
+                                                 // can result in a confusion.void Smtp::sendMail(const QString &from, const QString &to, const QString &cc, const QString &subject, const QString
+                                                 // &body, const QStringList &files, const QString &assinatura) { // FIXME: shadows
   message = "To: " + to + "\n";
   message.append("Cc: " + cc + "\n");
   message.append("From: " + from + "\n");
@@ -53,10 +60,7 @@ void Smtp::sendMail(const QString &from, const QString &to, const QString &cc, c
     //    QFile file("://assinatura conrado.png");
     QFile file(assinatura);
 
-    if (not file.open(QIODevice::ReadOnly)) {
-      QMessageBox::critical(nullptr, "Erro!", "Erro abrindo arquivo: " + file.errorString());
-      return;
-    }
+    if (not file.open(QIODevice::ReadOnly)) { return qApp->enqueueError("Erro abrindo arquivo: " + file.errorString()); }
 
     const QByteArray bytes = file.readAll();
     message.append("--frontier\n");
@@ -74,12 +78,7 @@ void Smtp::sendMail(const QString &from, const QString &to, const QString &cc, c
       QFile file(filePath);
 
       if (file.exists()) {
-        if (not file.open(QIODevice::ReadOnly)) {
-          //          qDebug("Couldn't open the file");
-          QMessageBox::critical(nullptr, "Qt Simple SMTP client", "Erro ao abrir o arquivo do anexo!");
-          QMessageBox::critical(nullptr, "Erro!", "Erro: " + file.errorString());
-          return;
-        }
+        if (not file.open(QIODevice::ReadOnly)) { return qApp->enqueueError("Erro ao abrir o arquivo do anexo: " + file.errorString()); }
 
         const QByteArray bytes = file.readAll();
         message.append("--frontier\n");
@@ -124,13 +123,13 @@ void Smtp::stateChanged(QAbstractSocket::SocketState socketState) {
   Q_UNUSED(socketState);
   //  qDebug() << "stateChanged " << socketState;
 
-  //  if (socketState == QAbstractSocket::UnconnectedState) emit status("Não conseguiu conectar ao servidor SMTP!");
+  //  if (socketState == QAbstractSocket::UnconnectedState) { emit status("Não conseguiu conectar ao servidor SMTP!"); }
 }
 
 void Smtp::errorReceived(QAbstractSocket::SocketError socketError) {
   if (socketError == QAbstractSocket::RemoteHostClosedError) { return; }
   //  qDebug() << "error: " << socketError;
-  if (socketError == QAbstractSocket::HostNotFoundError) emit status("Não encontrou o servidor SMTP!");
+  if (socketError == QAbstractSocket::HostNotFoundError) { emit status("Não encontrou o servidor SMTP!"); }
 }
 
 void Smtp::disconnected() {
@@ -239,7 +238,7 @@ void Smtp::readyRead() {
     rcpt.removeFirst();
     t->flush();
     //    qDebug() << "size: " << rcpt.size();
-    state = rcpt.size() > 0 ? States::Rcpt : States::Data;
+    state = not rcpt.isEmpty() ? States::Rcpt : States::Data;
   } else if (state == States::Data and responseLine == "250") {
 
     *t << "DATA\r\n";
@@ -262,7 +261,7 @@ void Smtp::readyRead() {
     return;
   } else {
     // something broke.
-    QMessageBox::critical(nullptr, tr("Qt Simple SMTP client"), tr("Unexpected reply from SMTP server:\n\n") + response);
+    qApp->enqueueError(tr("Unexpected reply from SMTP server:\n\n") + response);
     state = States::Close;
     emit status(tr("Failed to send message"));
   }

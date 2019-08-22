@@ -1,28 +1,23 @@
-#ifndef IMPORTAPRODUTOS_H
-#define IMPORTAPRODUTOS_H
+#pragma once
 
 #include <QProgressDialog>
 
-#include "dialog.h"
 #include "sqlrelationaltablemodel.h"
 
 namespace Ui {
 class ImportaProdutos;
 }
 
-class ImportaProdutos final : public Dialog {
+class ImportaProdutos final : public QDialog {
   Q_OBJECT
 
 public:
-  explicit ImportaProdutos(QWidget *parent = nullptr);
+  enum class Tipo { Produto = 0, Estoque = 1, Promocao = 2 }; // FIX: tipo não é mais 0/1/2 e sim colunas separadas
+  explicit ImportaProdutos(const Tipo tipo, QWidget *parent = nullptr);
   ~ImportaProdutos();
-  auto importarProduto() -> void;
-  auto importarEstoque() -> void;
-  auto importarPromocao() -> void;
+  auto importarTabela() -> void;
 
 private:
-  enum class Tipo { Produto = 0, Estoque = 1, Promocao = 2 };
-
   enum class FieldColors {
     White = 0,  // no change
     Green = 1,  // new value
@@ -32,14 +27,12 @@ private:
   };
 
   // attributes
-  bool hasError = false;
-  int i = 0;
+  int currentRow = 0;
   int itensError = 0;
   int itensExpired = 0;
   int itensImported = 0;
   int itensNotChanged = 0;
   int itensUpdated = 0;
-  int row = 0;
   int validade;
   QHash<int, bool> hashAtualizado;
   QHash<QString, int> hash;
@@ -53,12 +46,12 @@ private:
   SqlRelationalTableModel modelProduto;
   SqlRelationalTableModel modelErro;
   // REFAC: a tabela no BD nao usa mais uma unica coluna, nao é mais (1,2,3) e sim 3 colunas separadas
-  Tipo tipo;
+  const Tipo tipo;
   Ui::ImportaProdutos *ui;
   // methods
   auto atualizaCamposProduto() -> bool;
   auto atualizaProduto() -> bool;
-  auto buscarCadastrarFornecedor(const QString &fornecedor, int &id) -> bool;
+  auto buscarCadastrarFornecedor(const QString &fornecedor) -> std::optional<int>;
   auto cadastraFornecedores() -> bool;
   auto cadastraProduto() -> bool;
   auto camposForaDoPadrao() -> bool;
@@ -66,9 +59,7 @@ private:
   auto consistenciaDados() -> void;
   auto contaProdutos() -> void;
   auto expiraPrecosAntigos() -> bool;
-  auto guardaNovoPrecoValidade() -> bool;
   auto importar() -> bool;
-  auto importarTabela() -> void;
   auto insereEmErro() -> bool;
   auto insereEmOk() -> bool;
   auto leituraProduto(const QSqlQuery &query, const QSqlRecord &record) -> void;
@@ -77,13 +68,10 @@ private:
   auto mostraApenasEstesFornecedores() -> void;
   auto on_checkBoxRepresentacao_toggled(const bool checked) -> void;
   auto on_pushButtonSalvar_clicked() -> void;
-  auto on_tabWidget_currentChanged(const int index) -> void;
-  auto on_tableErro_entered(const QModelIndex &) -> void;
-  auto on_tableProdutos_entered(const QModelIndex &) -> void;
   auto pintarCamposForaDoPadrao(const int row) -> bool;
   auto readFile() -> bool;
   auto readValidade() -> bool;
-  auto salvar() -> void;
+  auto salvar() -> bool;
   auto setProgressDialog() -> void;
   auto setVariantMap() -> void;
   auto setupTables() -> void;
@@ -91,5 +79,3 @@ private:
   auto verificaSeRepresentacao() -> bool;
   auto verificaTabela(const QSqlRecord &record) -> bool;
 };
-
-#endif // IMPORTAPRODUTOS_H

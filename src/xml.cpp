@@ -1,15 +1,9 @@
 #include "xml.h"
 #include "application.h"
 
-XML::XML(const QByteArray &fileContent, const QString &fileName) : fileContent(fileContent), fileName(fileName) {
-  connect(this, &XML::informationSignal, qApp, &Application::enqueueInformation);
-  connect(this, &XML::warningSignal, qApp, &Application::enqueueWarning);
-  connect(this, &XML::errorSignal, qApp, &Application::enqueueError);
+XML::XML(const QByteArray &fileContent, const QString &fileName) : fileContent(fileContent), fileName(fileName) { montarArvore(); }
 
-  montarArvore(model);
-}
-
-void XML::readChild(QDomElement &element, QStandardItem *elementItem) {
+void XML::readChild(const QDomElement &element, QStandardItem *elementItem) {
   QDomElement child = element.firstChildElement();
 
   for (; not child.isNull(); child = child.nextSiblingElement()) {
@@ -62,8 +56,6 @@ void XML::lerValores(const QStandardItem *item) {
 void XML::lerDadosProduto(const QStandardItem *child) {
   QString text = child->text();
 
-  if (text.mid(0, 10) == "det nItem=") { itemNumero = text.right(text.size() - 10).remove(R"(")").toInt(); }
-
   if (child->parent()->text() == "prod") {
     if (text.left(7) == "cProd -") { codProd = text.remove(0, 8); }
     if (text.left(6) == "cEAN -") { codBarras = text.remove(0, 7); }
@@ -82,6 +74,9 @@ void XML::lerDadosProduto(const QStandardItem *child) {
     if (text.left(8) == "indTot -") { compoeTotal = static_cast<bool>(text.remove(0, 9).toInt()); }
     if (text.left(6) == "xPed -") { numeroPedido = text.remove(0, 7); }
     if (text.left(10) == "nItemPed -") { itemPedido = text.remove(0, 11).toInt(); }
+
+    // remove 'A' from end of product code
+    if (xNome == "CECRISA REVEST. CERAMICOS S.A." and codProd.endsWith("A")) { codProd = codProd.left(codProd.size() - 1); }
   }
 }
 
@@ -110,6 +105,16 @@ void XML::lerIPIProduto(const QStandardItem *child) {
 
   if (child->parent()->text() == "IPI") {
     if (text.left(6) == "cEnq -") { cEnq = text.remove(0, 7).toInt(); }
+  }
+
+  if (child->parent()->text() == "IPITrib") {
+    if (text.left(5) == "CST -") { cstIPI = text.remove(0, 6).toInt(); }
+    if (text.left(5) == "vBC -") { vBCIPI = text.remove(0, 6).toDouble(); }
+    if (text.left(6) == "pIPI -") { pIPI = text.remove(0, 7).toDouble(); }
+    if (text.left(6) == "vIPI -") { vIPI = text.remove(0, 7).toDouble(); }
+  }
+
+  if (child->parent()->text() == "IPINT") {
     if (text.left(5) == "CST -") { cstIPI = text.remove(0, 6).toInt(); }
   }
 }
@@ -158,16 +163,13 @@ void XML::lerTotais(const QStandardItem *child) {
   }
 }
 
-void XML::montarArvore(QStandardItemModel &model) {
+void XML::montarArvore() {
   if (fileContent.isEmpty()) { return; }
 
   QDomDocument document;
   QString error;
 
-  if (not document.setContent(fileContent, &error)) {
-    emit errorSignal("Erro lendo arquivo: " + error);
-    return;
-  }
+  if (not document.setContent(fileContent, &error)) { return qApp->enqueueError("Erro lendo arquivo: " + error); }
 
   QDomElement root = document.firstChildElement();
   QDomNamedNodeMap map = root.attributes();

@@ -16,6 +16,13 @@
   <layout class="QGridLayout" name="gridLayout_5">
    <item row="0" column="0" colspan="2">
     <layout class="QGridLayout" name="gridLayout_2">
+     <item row="0" column="2">
+      <widget class="QPushButton" name="pushButtonVenda">
+       <property name="text">
+        <string>Venda</string>
+       </property>
+      </widget>
+     </item>
      <item row="0" column="0">
       <widget class="QCheckBox" name="checkBoxEstoque">
        <property name="text">
@@ -23,24 +30,10 @@
        </property>
       </widget>
      </item>
-     <item row="0" column="3">
-      <widget class="QPushButton" name="pushButtonVenda">
-       <property name="text">
-        <string>Venda</string>
-       </property>
-      </widget>
-     </item>
-     <item row="0" column="2">
+     <item row="0" column="1">
       <widget class="QPushButton" name="pushButtonDanfe">
        <property name="text">
         <string>DANFE</string>
-       </property>
-      </widget>
-     </item>
-     <item row="0" column="1">
-      <widget class="QCheckBox" name="checkBoxSul">
-       <property name="text">
-        <string>SUL</string>
        </property>
       </widget>
      </item>
@@ -137,7 +130,7 @@
         </property>
         <layout class="QGridLayout" name="gridLayout_6">
          <item row="0" column="0">
-          <widget class="TableView" name="tableTransp2">
+          <widget class="TableView" name="tableTranspAgend">
            <property name="palette">
             <palette>
              <active>
@@ -216,7 +209,7 @@
           </widget>
          </item>
          <item row="0" column="0" colspan="2">
-          <widget class="TableView" name="tableTransp">
+          <widget class="TableView" name="tableTranspAtual">
            <property name="palette">
             <palette>
              <active>
@@ -353,7 +346,11 @@
     </widget>
    </item>
    <item row="2" column="1">
-    <widget class="QLineEdit" name="lineEditBusca"/>
+    <widget class="QLineEdit" name="lineEditBusca">
+     <property name="placeholderText">
+      <string>NFe/Produto/Venda/OC</string>
+     </property>
+    </widget>
    </item>
    <item row="3" column="0" colspan="2">
     <layout class="QHBoxLayout" name="horizontalLayout">

@@ -1,14 +1,14 @@
-#ifndef INSERIRTRANSFERENCIA_H
-#define INSERIRTRANSFERENCIA_H
+#pragma once
 
-#include "dialog.h"
+#include <QDialog>
+
 #include "sqlrelationaltablemodel.h"
 
 namespace Ui {
 class InserirTransferencia;
 }
 
-class InserirTransferencia final : public Dialog {
+class InserirTransferencia final : public QDialog {
   Q_OBJECT
 
 public:
@@ -27,5 +27,3 @@ private:
   auto setupTables() -> void;
   auto verifyFields() -> bool;
 };
-
-#endif // INSERIRTRANSFERENCIA_H

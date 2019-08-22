@@ -1,34 +1,33 @@
-#ifndef WIDGETCOMPRACONFIRMAR_H
-#define WIDGETCOMPRACONFIRMAR_H
+#pragma once
+
+#include <QWidget>
 
 #include "sqlrelationaltablemodel.h"
-#include "widget.h"
 
 namespace Ui {
 class WidgetCompraConfirmar;
 }
 
-class WidgetCompraConfirmar final : public Widget {
+class WidgetCompraConfirmar final : public QWidget {
   Q_OBJECT
 
 public:
   explicit WidgetCompraConfirmar(QWidget *parent = nullptr);
   ~WidgetCompraConfirmar();
-  auto updateTables() -> bool;
+  auto resetTables() -> void;
+  auto updateTables() -> void;
 
 private:
   // attributes
+  bool isSet = false;
+  bool modelIsSet = false;
   SqlRelationalTableModel modelViewCompras;
   SqlRelationalTableModel modelResumo;
   Ui::WidgetCompraConfirmar *ui;
   // methods
-  auto cancelar(const int row) -> bool;
   auto confirmarCompra(const QString &idCompra, const QDateTime &dataPrevista, const QDateTime &dataConf) -> bool;
-  auto on_checkBoxMostrarSul_toggled(bool checked) -> void;
   auto on_pushButtonCancelarCompra_clicked() -> void;
   auto on_pushButtonConfirmarCompra_clicked() -> void;
-  auto on_table_entered(const QModelIndex &) -> void;
   auto setupTables() -> void;
+  auto setConnections() -> void;
 };
-
-#endif // WIDGETCOMPRACONFIRMAR_H

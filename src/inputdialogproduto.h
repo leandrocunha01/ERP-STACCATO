@@ -1,14 +1,14 @@
-#ifndef INPUTDIALOGPRODUTO_H
-#define INPUTDIALOGPRODUTO_H
+#pragma once
 
-#include "dialog.h"
+#include <QDialog>
+
 #include "sqlrelationaltablemodel.h"
 
 namespace Ui {
 class InputDialogProduto;
 }
 
-class InputDialogProduto final : public Dialog {
+class InputDialogProduto final : public QDialog {
   Q_OBJECT
 
 public:
@@ -32,12 +32,10 @@ private:
   auto on_dateEditEvento_dateChanged(const QDate &date) -> void;
   auto on_doubleSpinBoxAliquota_valueChanged(double aliquota) -> void;
   auto on_doubleSpinBoxST_valueChanged(double valueSt) -> void;
+  auto on_lineEditCodRep_textEdited(const QString &text) -> void;
   auto on_pushButtonSalvar_clicked() -> void;
-  auto on_table_entered(const QModelIndex &) -> void;
   auto setConnections() -> void;
   auto setupTables() -> void;
   auto unsetConnections() -> void;
   auto updateTableData(const QModelIndex &topLeft) -> void;
 };
-
-#endif // INPUTDIALOGPRODUTO_H

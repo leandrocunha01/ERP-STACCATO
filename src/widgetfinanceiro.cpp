@@ -3,7 +3,7 @@
 #include "ui_widgetfinanceiro.h"
 #include "widgetfinanceiro.h"
 
-WidgetFinanceiro::WidgetFinanceiro(QWidget *parent) : Widget(parent), ui(new Ui::WidgetFinanceiro) {
+WidgetFinanceiro::WidgetFinanceiro(QWidget *parent) : QWidget(parent), ui(new Ui::WidgetFinanceiro) {
   ui->setupUi(this);
 
   ui->widgetPagar->setTipo(WidgetFinanceiroContas::Tipo::Pagar);
@@ -15,16 +15,22 @@ WidgetFinanceiro::WidgetFinanceiro(QWidget *parent) : Widget(parent), ui(new Ui:
 
 WidgetFinanceiro::~WidgetFinanceiro() { delete ui; }
 
-bool WidgetFinanceiro::updateTables() {
+void WidgetFinanceiro::updateTables() {
   const QString currentText = ui->tabWidget->tabText(ui->tabWidget->currentIndex());
 
-  if (currentText == "Fluxo de Caixa") return ui->widgetFluxoCaixa->updateTables();
-  if (currentText == "Contas a Pagar") return ui->widgetPagar->updateTables();
-  if (currentText == "Contas a Receber") return ui->widgetReceber->updateTables();
-  if (currentText == "Vendas") return ui->widgetVenda->updateTables();
-  if (currentText == "Compras") return ui->widgetCompra->updateTables();
+  if (currentText == "Fluxo de Caixa") { ui->widgetFluxoCaixa->updateTables(); }
+  if (currentText == "Contas a Pagar") { ui->widgetPagar->updateTables(); }
+  if (currentText == "Contas a Receber") { ui->widgetReceber->updateTables(); }
+  if (currentText == "Vendas") { ui->widgetVenda->updateTables(); }
+  if (currentText == "Compras") { ui->widgetCompra->updateTables(); }
+}
 
-  return true;
+void WidgetFinanceiro::resetTables() {
+  ui->widgetFluxoCaixa->resetTables();
+  ui->widgetPagar->resetTables();
+  ui->widgetReceber->resetTables();
+  ui->widgetVenda->resetTables();
+  ui->widgetCompra->resetTables();
 }
 
 void WidgetFinanceiro::setConnections() { connect(ui->tabWidget, &QTabWidget::currentChanged, this, &WidgetFinanceiro::updateTables); }

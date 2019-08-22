@@ -1,13 +1,12 @@
-#ifndef USERCONFIG_H
-#define USERCONFIG_H
+#pragma once
 
-#include "dialog.h"
+#include <QDialog>
 
 namespace Ui {
 class UserConfig;
 }
 
-class UserConfig final : public Dialog {
+class UserConfig final : public QDialog {
   Q_OBJECT
 
 public:
@@ -26,5 +25,3 @@ private:
   auto on_pushButtonSalvar_clicked() -> void;
   auto on_pushButtonVendasFolder_clicked() -> void;
 };
-
-#endif // USERCONFIG_H

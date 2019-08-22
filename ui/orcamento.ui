@@ -9,7 +9,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1170</width>
+    <width>1307</width>
     <height>879</height>
    </rect>
   </property>
@@ -530,7 +530,7 @@
              <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Sub-total bruto é o total do valor dos itens, &lt;span style=&quot; font-weight:600;&quot;&gt;sem nenhum desconto&lt;/span&gt;.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
             </property>
             <property name="frame">
-             <bool>false</bool>
+             <bool>true</bool>
             </property>
             <property name="readOnly">
              <bool>true</bool>
@@ -561,7 +561,7 @@
              <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Sub-total líq. do orçamento é o subtotal dos itens com desconto&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
             </property>
             <property name="frame">
-             <bool>false</bool>
+             <bool>true</bool>
             </property>
             <property name="readOnly">
              <bool>true</bool>
@@ -614,7 +614,7 @@
              <bool>false</bool>
             </property>
             <property name="frame">
-             <bool>false</bool>
+             <bool>true</bool>
             </property>
             <property name="readOnly">
              <bool>true</bool>
@@ -666,13 +666,6 @@
             <item>
              <layout class="QVBoxLayout" name="verticalLayout_6">
               <item>
-               <widget class="QLabel" name="labelLoja">
-                <property name="text">
-                 <string>Loja:</string>
-                </property>
-               </widget>
-              </item>
-              <item>
                <widget class="QLabel" name="labelOrcamento">
                 <property name="text">
                  <string>Orçamento:</string>
@@ -693,7 +686,7 @@
                </widget>
               </item>
               <item>
-               <widget class="QLabel" name="labelVendedorIndicou">
+               <widget class="QLabel" name="labelConsultor">
                 <property name="sizePolicy">
                  <sizepolicy hsizetype="Fixed" vsizetype="Preferred">
                   <horstretch>0</horstretch>
@@ -701,7 +694,7 @@
                  </sizepolicy>
                 </property>
                 <property name="text">
-                 <string>Vendedor que indicou:</string>
+                 <string>Consultor:</string>
                 </property>
                </widget>
               </item>
@@ -716,9 +709,6 @@
             </item>
             <item>
              <layout class="QVBoxLayout" name="verticalLayout_4">
-              <item>
-               <widget class="ComboBox" name="comboBoxLoja"/>
-              </item>
               <item>
                <widget class="QLineEdit" name="lineEditOrcamento">
                 <property name="toolTip">
@@ -736,7 +726,7 @@
                <widget class="ItemBox" name="itemBoxVendedor"/>
               </item>
               <item>
-               <widget class="ItemBox" name="itemBoxVendedorIndicou"/>
+               <widget class="ItemBox" name="itemBoxConsultor"/>
               </item>
               <item>
                <widget class="ItemBox" name="itemBoxCliente"/>
@@ -804,7 +794,7 @@
                 <item>
                  <widget class="QSpinBox" name="spinBoxValidade">
                   <property name="toolTip">
-                   <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Validade em dias do orçamento, contando a partir de hoje&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                   <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Validade em dias do orçamento, contando a partir de hoje (limitado ao fim do mês)&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
                   </property>
                   <property name="suffix">
                    <string> dias</string>
@@ -826,7 +816,7 @@
                <widget class="ItemBox" name="itemBoxProfissional"/>
               </item>
               <item row="0" column="0">
-               <widget class="QDateTimeEdit" name="dateTimeEdit">
+               <widget class="QDateTimeEdit" name="dataEmissao">
                 <property name="toolTip">
                  <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Data/hora em que o orçamento foi criado pela primeira vez&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
                 </property>
@@ -1100,7 +1090,7 @@
                <number>4</number>
               </property>
               <property name="minimum">
-               <double>-10000.000000000000000</double>
+               <double>-100000000.000000000000000</double>
               </property>
               <property name="maximum">
                <double>100.000000000000000</double>
@@ -1312,6 +1302,9 @@
             <property name="selectionBehavior">
              <enum>QAbstractItemView::SelectRows</enum>
             </property>
+            <property name="sortingEnabled">
+             <bool>true</bool>
+            </property>
            </widget>
           </item>
           <item row="0" column="1" rowspan="3">
@@ -1349,19 +1342,6 @@
               </property>
               <property name="text">
                <string>Remover</string>
-              </property>
-              <property name="autoDefault">
-               <bool>false</bool>
-              </property>
-             </widget>
-            </item>
-            <item>
-             <widget class="QPushButton" name="pushButtonLimparSelecao">
-              <property name="toolTip">
-               <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Remover item selecionado&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-              </property>
-              <property name="text">
-               <string>Limpar seleção</string>
               </property>
               <property name="autoDefault">
                <bool>false</bool>
@@ -1510,11 +1490,6 @@ color: rgb(0, 0, 0);</string>
    <header>src/itembox.h</header>
   </customwidget>
   <customwidget>
-   <class>ComboBox</class>
-   <extends>QComboBox</extends>
-   <header>src/combobox.h</header>
-  </customwidget>
-  <customwidget>
    <class>LineEditDecimal</class>
    <extends>QLineEdit</extends>
    <header>src/lineeditdecimal.h</header>
@@ -1522,25 +1497,57 @@ color: rgb(0, 0, 0);</string>
  </customwidgets>
  <tabstops>
   <tabstop>tabWidget</tabstop>
-  <tabstop>dateTimeEdit</tabstop>
-  <tabstop>spinBoxValidade</tabstop>
+  <tabstop>lineEditOrcamento</tabstop>
   <tabstop>itemBoxVendedor</tabstop>
-  <tabstop>itemBoxProfissional</tabstop>
+  <tabstop>itemBoxConsultor</tabstop>
   <tabstop>itemBoxCliente</tabstop>
+  <tabstop>dataEmissao</tabstop>
+  <tabstop>itemBoxProfissional</tabstop>
   <tabstop>itemBoxEndereco</tabstop>
+  <tabstop>spinBoxValidade</tabstop>
+  <tabstop>checkBoxRepresentacao</tabstop>
   <tabstop>itemBoxProduto</tabstop>
+  <tabstop>lineEditPrecoUn</tabstop>
+  <tabstop>doubleSpinBoxCaixas</tabstop>
+  <tabstop>doubleSpinBoxQuant</tabstop>
+  <tabstop>spinBoxMinimo</tabstop>
+  <tabstop>spinBoxUnCx</tabstop>
+  <tabstop>lineEditUn</tabstop>
   <tabstop>doubleSpinBoxDesconto</tabstop>
-  <tabstop>tableProdutos</tabstop>
+  <tabstop>doubleSpinBoxTotalItem</tabstop>
+  <tabstop>pushButtonCalculadora</tabstop>
+  <tabstop>lineEditFornecedor</tabstop>
+  <tabstop>lineEditCodComercial</tabstop>
+  <tabstop>lineEditFormComercial</tabstop>
+  <tabstop>lineEditEstoque</tabstop>
+  <tabstop>lineEditObs</tabstop>
   <tabstop>pushButtonAtualizarItem</tabstop>
   <tabstop>pushButtonAdicionarItem</tabstop>
   <tabstop>pushButtonRemoverItem</tabstop>
-  <tabstop>pushButtonLimparSelecao</tabstop>
+  <tabstop>tableProdutos</tabstop>
+  <tabstop>lineEditEstoque_4</tabstop>
+  <tabstop>lineEditEstoque_3</tabstop>
+  <tabstop>lineEditPromocao_2</tabstop>
+  <tabstop>spinBoxPrazoEntrega</tabstop>
+  <tabstop>plainTextEditObs</tabstop>
+  <tabstop>plainTextEditBaixa</tabstop>
+  <tabstop>lineEditReplicaDe</tabstop>
+  <tabstop>lineEditReplicadoEm</tabstop>
+  <tabstop>pushButtonCalcularFrete</tabstop>
+  <tabstop>checkBoxFreteManual</tabstop>
   <tabstop>doubleSpinBoxSubTotalBruto</tabstop>
+  <tabstop>doubleSpinBoxSubTotalLiq</tabstop>
+  <tabstop>doubleSpinBoxDescontoGlobalReais</tabstop>
+  <tabstop>doubleSpinBoxDescontoGlobal</tabstop>
+  <tabstop>doubleSpinBoxFrete</tabstop>
+  <tabstop>doubleSpinBoxTotal</tabstop>
   <tabstop>pushButtonGerarVenda</tabstop>
   <tabstop>pushButtonReplicar</tabstop>
   <tabstop>pushButtonCadastrarOrcamento</tabstop>
   <tabstop>pushButtonAtualizarOrcamento</tabstop>
+  <tabstop>pushButtonGerarExcel</tabstop>
   <tabstop>pushButtonImprimir</tabstop>
+  <tabstop>pushButtonApagarOrc</tabstop>
  </tabstops>
  <resources>
   <include location="../qrs/resources.qrc"/>

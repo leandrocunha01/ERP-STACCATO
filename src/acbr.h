@@ -1,26 +1,37 @@
-#ifndef ACBR_H
-#define ACBR_H
+#pragma once
 
 #include <QObject>
+#include <QProgressDialog>
 #include <QTcpSocket>
-#include <optional>
 
 class ACBr final : public QObject {
   Q_OBJECT
 
 public:
-  ACBr() = delete;
-  static auto consultarNFe(const int idNFe) -> std::optional<std::tuple<QString, QString>>;
-  static auto enviarComando(const QString &comando) -> std::optional<QString>;
-  static auto enviarEmail(const QString &emailDestino, const QString &emailCopia, const QString &assunto, const QString &anexo) -> bool;
-  static auto gerarDanfe(const QByteArray &fileContent, const bool openFile = true) -> std::optional<QString>;
-  static auto gerarDanfe(const int idNFe) -> bool;
+  explicit ACBr(QObject *parent = nullptr);
+  ~ACBr() = default;
+  auto consultarNFe(const int idNFe) -> std::optional<std::tuple<QString, QString>>;
+  auto enviarComando(const QString &comando, const bool local = false) -> std::optional<QString>;
+  auto enviarEmail(const QString &emailDestino, const QString &emailCopia, const QString &assunto, const QString &filePath) -> bool;
+  auto gerarDanfe(const QByteArray &fileContent, const bool openFile = true) -> std::optional<QString>;
+  auto gerarDanfe(const int idNFe) -> bool;
 
 private:
   // attributes
-  inline static QTcpSocket *socket = new QTcpSocket(nullptr);
+  QTcpSocket socket;
+  const QString welcome = "Esperando por comandos.\x03";
+  QString resposta;
+  bool pronto = false;
+  bool conectado = false;
+  bool enviado = false;
+  bool recebido = false;
+  QProgressDialog *progressDialog = new QProgressDialog();
   // methods
-  static auto abrirPdf(const QString &resposta) -> bool;
+  auto abrirPdf(const QString &filePath) -> bool;
+  auto error() -> void;
+  auto readSocket() -> void;
+  auto removerNota(const int idNFe) -> void;
+  auto setConnected() -> void;
+  auto setDisconnected() -> void;
+  auto write() -> void;
 };
-
-#endif // ACBR_H

@@ -42,103 +42,16 @@
          <bool>false</bool>
         </property>
         <layout class="QGridLayout" name="gridLayout_5">
-         <item row="3" column="0">
-          <widget class="QCheckBox" name="checkBoxFiltroFaturamento">
+         <item row="10" column="0">
+          <widget class="QCheckBox" name="checkBoxFiltroRepoReceb">
            <property name="enabled">
             <bool>true</bool>
            </property>
            <property name="text">
-            <string>Em faturamento</string>
+            <string>Repo. Receb.</string>
            </property>
-          </widget>
-         </item>
-         <item row="6" column="0">
-          <widget class="QCheckBox" name="checkBoxFiltroEstoque">
-           <property name="enabled">
+           <property name="checked">
             <bool>true</bool>
-           </property>
-           <property name="text">
-            <string>Estoque</string>
-           </property>
-          </widget>
-         </item>
-         <item row="2" column="0">
-          <widget class="QCheckBox" name="checkBoxFiltroCompra">
-           <property name="enabled">
-            <bool>true</bool>
-           </property>
-           <property name="text">
-            <string>Em compra</string>
-           </property>
-          </widget>
-         </item>
-         <item row="4" column="0">
-          <widget class="QCheckBox" name="checkBoxFiltroColeta">
-           <property name="enabled">
-            <bool>true</bool>
-           </property>
-           <property name="text">
-            <string>Em coleta</string>
-           </property>
-          </widget>
-         </item>
-         <item row="5" column="0">
-          <widget class="QCheckBox" name="checkBoxFiltroRecebimento">
-           <property name="enabled">
-            <bool>true</bool>
-           </property>
-           <property name="text">
-            <string>Em recebimento</string>
-           </property>
-          </widget>
-         </item>
-         <item row="8" column="0">
-          <widget class="QCheckBox" name="checkBoxFiltroEmEntrega">
-           <property name="enabled">
-            <bool>true</bool>
-           </property>
-           <property name="text">
-            <string>Em entrega</string>
-           </property>
-          </widget>
-         </item>
-         <item row="13" column="0">
-          <widget class="QCheckBox" name="checkBoxFiltroSul">
-           <property name="enabled">
-            <bool>true</bool>
-           </property>
-           <property name="text">
-            <string>SUL</string>
-           </property>
-          </widget>
-         </item>
-         <item row="0" column="0">
-          <widget class="QCheckBox" name="checkBoxFiltroPendentes">
-           <property name="enabled">
-            <bool>true</bool>
-           </property>
-           <property name="text">
-            <string>Pendente</string>
-           </property>
-          </widget>
-         </item>
-         <item row="11" column="0">
-          <widget class="QCheckBox" name="checkBoxFiltroRepoEntrega">
-           <property name="enabled">
-            <bool>true</bool>
-           </property>
-           <property name="text">
-            <string>Repo. Entrega</string>
-           </property>
-          </widget>
-         </item>
-         <item row="1" column="0">
-          <widget class="QCheckBox" name="checkBoxFiltroIniciados">
-           <property name="enabled">
-            <bool>true</bool>
-           </property>
-           <property name="text">
-            <string>Iniciado</string>
            </property>
           </widget>
          </item>
@@ -152,13 +65,13 @@
            </property>
           </widget>
          </item>
-         <item row="10" column="0">
-          <widget class="QCheckBox" name="checkBoxFiltroRepoReceb">
+         <item row="6" column="0">
+          <widget class="QCheckBox" name="checkBoxFiltroEstoque">
            <property name="enabled">
             <bool>true</bool>
            </property>
            <property name="text">
-            <string>Repo. Receb.</string>
+            <string>Estoque</string>
            </property>
           </widget>
          </item>
@@ -169,6 +82,92 @@
            </property>
            <property name="text">
             <string>Entregue</string>
+           </property>
+          </widget>
+         </item>
+         <item row="11" column="0">
+          <widget class="QCheckBox" name="checkBoxFiltroRepoEntrega">
+           <property name="enabled">
+            <bool>true</bool>
+           </property>
+           <property name="text">
+            <string>Repo. Entrega</string>
+           </property>
+           <property name="checked">
+            <bool>true</bool>
+           </property>
+          </widget>
+         </item>
+         <item row="8" column="0">
+          <widget class="QCheckBox" name="checkBoxFiltroEmEntrega">
+           <property name="enabled">
+            <bool>true</bool>
+           </property>
+           <property name="text">
+            <string>Em entrega</string>
+           </property>
+          </widget>
+         </item>
+         <item row="3" column="0">
+          <widget class="QCheckBox" name="checkBoxFiltroFaturamento">
+           <property name="enabled">
+            <bool>true</bool>
+           </property>
+           <property name="text">
+            <string>Em faturamento</string>
+           </property>
+          </widget>
+         </item>
+         <item row="2" column="0">
+          <widget class="QCheckBox" name="checkBoxFiltroCompra">
+           <property name="enabled">
+            <bool>true</bool>
+           </property>
+           <property name="text">
+            <string>Em compra</string>
+           </property>
+          </widget>
+         </item>
+         <item row="1" column="0">
+          <widget class="QCheckBox" name="checkBoxFiltroIniciados">
+           <property name="enabled">
+            <bool>true</bool>
+           </property>
+           <property name="text">
+            <string>Iniciado</string>
+           </property>
+          </widget>
+         </item>
+         <item row="5" column="0">
+          <widget class="QCheckBox" name="checkBoxFiltroRecebimento">
+           <property name="enabled">
+            <bool>true</bool>
+           </property>
+           <property name="text">
+            <string>Em recebimento</string>
+           </property>
+          </widget>
+         </item>
+         <item row="0" column="0">
+          <widget class="QCheckBox" name="checkBoxFiltroPendentes">
+           <property name="enabled">
+            <bool>true</bool>
+           </property>
+           <property name="text">
+            <string>Pendente</string>
+           </property>
+           <property name="checked">
+            <bool>true</bool>
+           </property>
+          </widget>
+         </item>
+         <item row="4" column="0">
+          <widget class="QCheckBox" name="checkBoxFiltroColeta">
+           <property name="enabled">
+            <bool>true</bool>
+           </property>
+           <property name="text">
+            <string>Em coleta</string>
            </property>
           </widget>
          </item>
@@ -277,7 +276,11 @@
      </property>
      <layout class="QGridLayout" name="gridLayout_2">
       <item row="2" column="1">
-       <widget class="QLineEdit" name="lineEditBusca"/>
+       <widget class="QLineEdit" name="lineEditBusca">
+        <property name="placeholderText">
+         <string>Venda/Fornecedor/Produto/Cód. Com</string>
+        </property>
+       </widget>
       </item>
       <item row="1" column="0" colspan="2">
        <widget class="TableView" name="table">
@@ -296,12 +299,6 @@
         <property name="sortingEnabled">
          <bool>true</bool>
         </property>
-        <attribute name="horizontalHeaderCascadingSectionResizes">
-         <bool>true</bool>
-        </attribute>
-        <attribute name="horizontalHeaderStretchLastSection">
-         <bool>false</bool>
-        </attribute>
        </widget>
       </item>
       <item row="0" column="0" colspan="2">

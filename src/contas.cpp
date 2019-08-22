@@ -1,10 +1,9 @@
-#include <QDate>
 #include <QDebug>
-#include <QMessageBox>
 #include <QSqlError>
 #include <QSqlQuery>
 #include <QtMath>
 
+#include "application.h"
 #include "checkboxdelegate.h"
 #include "comboboxdelegate.h"
 #include "contas.h"
@@ -16,7 +15,7 @@
 #include "reaisdelegate.h"
 #include "ui_contas.h"
 
-Contas::Contas(const Tipo tipo, QWidget *parent) : Dialog(parent), tipo(tipo), ui(new Ui::Contas) {
+Contas::Contas(const Tipo tipo, QWidget *parent) : QDialog(parent), tipo(tipo), ui(new Ui::Contas) {
   ui->setupUi(this);
 
   setWindowFlags(Qt::Window);
@@ -26,8 +25,6 @@ Contas::Contas(const Tipo tipo, QWidget *parent) : Dialog(parent), tipo(tipo), u
   showMaximized();
 
   connect(ui->pushButtonSalvar, &QPushButton::clicked, this, &Contas::on_pushButtonSalvar_clicked);
-  connect(ui->tablePendentes, &TableView::entered, this, &Contas::on_tablePendentes_entered);
-  connect(ui->tableProcessados, &TableView::entered, this, &Contas::on_tableProcessados_entered);
   connect(&modelPendentes, &QSqlTableModel::dataChanged, this, &Contas::preencher);
   connect(&modelPendentes, &QSqlTableModel::dataChanged, this, &Contas::validarData);
 }
@@ -42,23 +39,21 @@ void Contas::validarData(const QModelIndex &index) {
     query.prepare("SELECT dataPagamento FROM " + modelPendentes.tableName() + " WHERE idPagamento = :idPagamento");
     query.bindValue(":idPagamento", idPagamento);
 
-    if (not query.exec() or not query.first()) {
-      emit errorSignal("Erro buscando dataPagamento: " + query.lastError().text());
-      return;
-    }
+    if (not query.exec() or not query.first()) { return qApp->enqueueError("Erro buscando dataPagamento: " + query.lastError().text(), this); }
 
     const QDate oldDate = query.value("dataPagamento").toDate();
     const QDate newDate = modelPendentes.data(index.row(), "dataPagamento").toDate();
 
     if (oldDate.isNull()) { return; }
 
+    // TODO: verificar se essa funcao nao precisa retornar um bool e porque ela nao retorna nos erros
     if (tipo == Tipo::Pagar and (newDate > oldDate.addDays(92) or newDate < oldDate.addDays(-32))) {
-      emit errorSignal("Limite de alteração de data excedido! Use corrigir fluxo na tela de compras!");
+      qApp->enqueueError("Limite de alteração de data excedido! Use corrigir fluxo na tela de compras!", this);
       if (not modelPendentes.setData(index.row(), "dataPagamento", oldDate)) { return; }
     }
 
     if (tipo == Tipo::Receber and (newDate > oldDate.addDays(32) or newDate < oldDate.addDays(-92))) {
-      emit errorSignal("Limite de alteração de data excedido! Use corrigir fluxo na tela de vendas!");
+      qApp->enqueueError("Limite de alteração de data excedido! Use corrigir fluxo na tela de vendas!", this);
       if (not modelPendentes.setData(index.row(), "dataPagamento", oldDate)) { return; }
     }
   }
@@ -70,16 +65,13 @@ void Contas::preencher(const QModelIndex &index) {
     query.prepare("SELECT valor FROM " + modelPendentes.tableName() + " WHERE idPagamento = :idPagamento");
     query.bindValue(":idPagamento", modelPendentes.data(index.row(), "idPagamento"));
 
-    if (not query.exec() or not query.first()) {
-      emit errorSignal("Erro buscando valor: " + query.lastError().text());
-      return;
-    }
+    if (not query.exec() or not query.first()) { return qApp->enqueueError("Erro buscando valor: " + query.lastError().text(), this); }
 
     const double oldValor = query.value("valor").toDouble();
     const double newValor = modelPendentes.data(index.row(), "valor").toDouble();
 
     if ((oldValor / newValor < 0.99 or oldValor / newValor > 1.01) and qFabs(oldValor - newValor) > 5) {
-      emit errorSignal("Limite de alteração de valor excedido! Use a função de corrigir fluxo!");
+      qApp->enqueueError("Limite de alteração de valor excedido! Use a função de corrigir fluxo!", this);
       if (not modelPendentes.setData(index.row(), "valor", oldValor)) { return; }
     }
   }
@@ -92,10 +84,9 @@ void Contas::preencher(const QModelIndex &index) {
     if (not modelPendentes.setData(index.row(), "contaDestino", 3)) { return; }
     if (not modelPendentes.setData(index.row(), "centroCusto", modelPendentes.data(index.row(), "idLoja"))) { return; }
 
-    //
+    // -------------------------------------------------------------------------
 
-    const QModelIndexList list =
-        modelPendentes.match(modelPendentes.index(0, modelPendentes.fieldIndex("tipo")), Qt::DisplayRole, modelPendentes.data(index.row(), "tipo").toString().left(1) + ". Taxa Cartão", -1);
+    const QModelIndexList list = modelPendentes.match("tipo", modelPendentes.data(index.row(), "tipo").toString().left(1) + ". Taxa Cartão", -1);
 
     for (const auto &indexMatch : list) {
       if (modelPendentes.data(indexMatch.row(), "parcela") != modelPendentes.data(index.row(), "parcela")) { continue; }
@@ -119,7 +110,6 @@ void Contas::preencher(const QModelIndex &index) {
 
 void Contas::setupTables() {
   modelPendentes.setTable(tipo == Tipo::Receber ? "conta_a_receber_has_pagamento" : "conta_a_pagar_has_pagamento");
-  modelPendentes.setEditStrategy(QSqlTableModel::OnManualSubmit);
 
   modelPendentes.setHeaderData("dataEmissao", "Data Emissão");
   modelPendentes.setHeaderData("contraParte", "ContraParte");
@@ -141,49 +131,34 @@ void Contas::setupTables() {
   modelPendentes.setHeaderData("subGrupo", "SubGrupo");
 
   ui->tablePendentes->setModel(&modelPendentes);
-  ui->tablePendentes->setItemDelegate(new DoubleDelegate(this));
 
+  ui->tablePendentes->setItemDelegateForColumn("valorReal", new ReaisDelegate(this));
   ui->tablePendentes->setItemDelegateForColumn("dataEmissao", new NoEditDelegate(this));
   ui->tablePendentes->setItemDelegateForColumn("contraParte", new NoEditDelegate(this));
-  //  ui->tablePendentes->setItemDelegateForColumn("valor", new NoEditDelegate(this));
   ui->tablePendentes->setItemDelegateForColumn("valor", new ReaisDelegate(this));
+  ui->tablePendentes->setItemDelegateForColumn("valorReal", new ReaisDelegate(this));
   ui->tablePendentes->setItemDelegateForColumn("tipo", new NoEditDelegate(this));
   ui->tablePendentes->setItemDelegateForColumn("parcela", new NoEditDelegate(this));
   // TODO: 3dateEditDelegate para vencimento
-  //  ui->tablePendentes->setItemDelegateForColumn("dataPagamento", new DateEditDelegate(this));
-  ui->tablePendentes->setItemDelegateForColumn("dataPagamento", new DateFormatDelegate(this));
-  ui->tablePendentes->setItemDelegateForColumn("dataRealizado", new DateFormatDelegate(this));
+  ui->tablePendentes->setItemDelegateForColumn("dataPagamento", new DateFormatDelegate("dataPagamento", this));
+  ui->tablePendentes->setItemDelegateForColumn("dataRealizado", new DateFormatDelegate("dataPagamento", this));
 
   if (tipo == Tipo::Receber) {
-    //    ui->tablePendentes->setItemDelegateForColumn("contraParte",
-    //                                                 new LineEditDelegate(LineEditDelegate::ContraParteReceber,
-    //                                                 this));
+    //    ui->tablePendentes->setItemDelegateForColumn("contraParte", new LineEditDelegate(LineEditDelegate::ContraParteReceber, this));
     ui->tablePendentes->setItemDelegateForColumn("status", new ComboBoxDelegate(ComboBoxDelegate::Tipo::StatusReceber, this));
-    //    ui->tablePendentes->setItemDelegateForColumn("contaDestino",
-    //                                                 new ItemBoxDelegate(ItemBoxDelegate::Conta, false, this));
-    //    ui->tablePendentes->setItemDelegateForColumn("representacao", new CheckBoxDelegate(this, true));
-    //    ui->tablePendentes->setItemDelegateForColumn("centroCusto",
-    //                                                 new ItemBoxDelegate(ItemBoxDelegate::Loja, false, this));
-    //    ui->tablePendentes->setItemDelegateForColumn("grupo", new LineEditDelegate(LineEditDelegate::Grupo, this));
   }
 
   if (tipo == Tipo::Pagar) {
-    //    ui->tablePendentes->setItemDelegateForColumn("contraParte",
-    //                                                 new LineEditDelegate(LineEditDelegate::ContraPartePagar, this));
+    //    ui->tablePendentes->setItemDelegateForColumn("contraParte", new LineEditDelegate(LineEditDelegate::ContraPartePagar, this));
     ui->tablePendentes->setItemDelegateForColumn("status", new ComboBoxDelegate(ComboBoxDelegate::Tipo::StatusPagar, this));
-    //    ui->tablePendentes->setItemDelegateForColumn("contaDestino",
-    //                                                 new ItemBoxDelegate(ItemBoxDelegate::Conta, false, this));
-    //    ui->tablePendentes->setItemDelegateForColumn("representacao", new CheckBoxDelegate(this, true));
-    //    ui->tablePendentes->setItemDelegateForColumn("centroCusto",
-    //                                                 new ItemBoxDelegate(ItemBoxDelegate::Loja, false, this));
-    //    ui->tablePendentes->setItemDelegateForColumn("grupo", new LineEditDelegate(LineEditDelegate::Grupo, this));
   }
 
-  //  ui->tablePendentes->setItemDelegateForColumn("valor", new ReaisDelegate(this));
   ui->tablePendentes->setItemDelegateForColumn("contaDestino", new ItemBoxDelegate(ItemBoxDelegate::Tipo::Conta, false, this));
   ui->tablePendentes->setItemDelegateForColumn("representacao", new CheckBoxDelegate(this, true));
   ui->tablePendentes->setItemDelegateForColumn("centroCusto", new ItemBoxDelegate(ItemBoxDelegate::Tipo::Loja, false, this));
   ui->tablePendentes->setItemDelegateForColumn("grupo", new LineEditDelegate(LineEditDelegate::Tipo::Grupo, this));
+
+  ui->tablePendentes->setPersistentColumns({"status", "contaDestino", "centroCusto"});
 
   ui->tablePendentes->hideColumn("idCompra");
   ui->tablePendentes->hideColumn("representacao");
@@ -196,12 +171,9 @@ void Contas::setupTables() {
   ui->tablePendentes->hideColumn("taxa");
   ui->tablePendentes->hideColumn("desativado");
 
-  ui->tablePendentes->resizeColumnsToContents();
-
-  //
+  // -------------------------------------------------------------------------
 
   modelProcessados.setTable(tipo == Tipo::Receber ? "conta_a_receber_has_pagamento" : "conta_a_pagar_has_pagamento");
-  modelProcessados.setEditStrategy(QSqlTableModel::OnManualSubmit);
 
   modelProcessados.setHeaderData("dataEmissao", "Data Emissão");
   modelProcessados.setHeaderData("contraParte", "ContraParte");
@@ -223,11 +195,17 @@ void Contas::setupTables() {
   modelProcessados.setHeaderData("subGrupo", "SubGrupo");
 
   ui->tableProcessados->setModel(&modelProcessados);
-  ui->tableProcessados->setItemDelegate(new DoubleDelegate(this));
+
+  ui->tableProcessados->setItemDelegateForColumn("valor", new ReaisDelegate(this));
+  ui->tableProcessados->setItemDelegateForColumn("valorReal", new ReaisDelegate(this));
+
   ui->tableProcessados->setItemDelegateForColumn("status", new ComboBoxDelegate(ComboBoxDelegate::Tipo::StatusReceber, this));
   ui->tableProcessados->setItemDelegateForColumn("contaDestino", new ItemBoxDelegate(ItemBoxDelegate::Tipo::Conta, true, this));
   ui->tableProcessados->setItemDelegateForColumn("representacao", new CheckBoxDelegate(this, true));
   ui->tableProcessados->setItemDelegateForColumn("centroCusto", new ItemBoxDelegate(ItemBoxDelegate::Tipo::Loja, true, this));
+
+  ui->tableProcessados->setPersistentColumns({"contaDestino", "centroCusto"});
+
   ui->tableProcessados->hideColumn("representacao");
   ui->tableProcessados->hideColumn("idPagamento");
   ui->tableProcessados->hideColumn("idVenda");
@@ -238,47 +216,18 @@ void Contas::setupTables() {
   ui->tableProcessados->hideColumn("comissao");
   ui->tableProcessados->hideColumn("taxa");
   ui->tableProcessados->hideColumn("desativado");
-
-  ui->tableProcessados->resizeColumnsToContents();
 }
 
 bool Contas::verifyFields() {
   for (int row = 0; row < modelPendentes.rowCount(); ++row) {
     if ((tipo == Tipo::Pagar and modelPendentes.data(row, "status").toString() == "PAGO") or (tipo == Tipo::Receber and modelPendentes.data(row, "status").toString() == "RECEBIDO")) {
-      if (modelPendentes.data(row, "dataRealizado").toString().isEmpty()) {
-        emit errorSignal("'Data Realizado' vazio!");
-        return false;
-      }
-
-      if (modelPendentes.data(row, "valorReal").toString().isEmpty()) {
-        emit errorSignal("'R$ Real' vazio!");
-        return false;
-      }
-
-      if (modelPendentes.data(row, "tipoReal").toString().isEmpty()) {
-        emit errorSignal("'Tipo Real' vazio!");
-        return false;
-      }
-
-      if (modelPendentes.data(row, "parcelaReal").toString().isEmpty()) {
-        emit errorSignal("'Parcela Real' vazio!");
-        return false;
-      }
-
-      if (modelPendentes.data(row, "contaDestino").toString().isEmpty()) {
-        emit errorSignal("'Conta Dest.' vazio!");
-        return false;
-      }
-
-      if (modelPendentes.data(row, "centroCusto").toString().isEmpty()) {
-        emit errorSignal("'Centro Custo' vazio!");
-        return false;
-      }
-
-      if (modelPendentes.data(row, "grupo").toString().isEmpty()) {
-        emit errorSignal("'Grupo' vazio!");
-        return false;
-      }
+      if (modelPendentes.data(row, "dataRealizado").toString().isEmpty()) { return qApp->enqueueError(false, "'Data Realizado' vazio!", this); }
+      if (modelPendentes.data(row, "valorReal").toString().isEmpty()) { return qApp->enqueueError(false, "'R$ Real' vazio!", this); }
+      if (modelPendentes.data(row, "tipoReal").toString().isEmpty()) { return qApp->enqueueError(false, "'Tipo Real' vazio!", this); }
+      if (modelPendentes.data(row, "parcelaReal").toString().isEmpty()) { return qApp->enqueueError(false, "'Parcela Real' vazio!", this); }
+      if (modelPendentes.data(row, "contaDestino").toString().isEmpty()) { return qApp->enqueueError(false, "'Conta Dest.' vazio!", this); }
+      if (modelPendentes.data(row, "centroCusto").toString().isEmpty()) { return qApp->enqueueError(false, "'Centro Custo' vazio!", this); }
+      if (modelPendentes.data(row, "grupo").toString().isEmpty()) { return qApp->enqueueError(false, "'Grupo' vazio!", this); }
     }
   }
 
@@ -288,10 +237,7 @@ bool Contas::verifyFields() {
 void Contas::on_pushButtonSalvar_clicked() {
   if (not verifyFields()) { return; }
 
-  if (not modelPendentes.submitAll()) {
-    emit errorSignal("Erro salvando dados: " + modelPendentes.lastError().text());
-    return;
-  }
+  if (not modelPendentes.submitAll()) { return; }
 
   close();
 }
@@ -302,41 +248,19 @@ void Contas::viewConta(const QString &idPagamento, const QString &contraparte) {
     query.prepare("SELECT idVenda FROM conta_a_receber_has_pagamento WHERE idPagamento = :idPagamento");
     query.bindValue(":idPagamento", idPagamento);
 
-    if (not query.exec() or not query.first()) {
-      emit errorSignal("Erro buscando dados: " + query.lastError().text());
-      return;
-    }
+    if (not query.exec() or not query.first()) { return qApp->enqueueError("Erro buscando dados: " + query.lastError().text(), this); }
 
     const QString idVenda = query.value("idVenda").toString();
 
     setWindowTitle("Contas A Receber - " + contraparte + " " + idVenda);
 
-    modelPendentes.setFilter(idVenda.isEmpty() ? "idPagamento = " + idPagamento + " AND (status = 'PENDENTE' OR status = 'CONFERIDO') AND representacao = FALSE"
-                                               : "idVenda LIKE '" + idVenda + "%' AND (status = 'PENDENTE' OR status = 'CONFERIDO') AND representacao = FALSE");
+    modelPendentes.setFilter(idVenda.isEmpty() ? "idPagamento = " + idPagamento + " AND status IN ('PENDENTE', 'CONFERIDO') AND representacao = FALSE"
+                                               : "idVenda LIKE '" + idVenda + "%' AND status IN ('PENDENTE', 'CONFERIDO') AND representacao = FALSE");
 
-    if (not modelPendentes.select()) { emit errorSignal("Erro lendo tabela conta_a_receber_has_pagamento: " + modelPendentes.lastError().text()); }
+    // -------------------------------------------------------------------------
 
-    ui->tablePendentes->resizeColumnsToContents();
-
-    for (int row = 0, rowCount = modelPendentes.rowCount(); row < rowCount; ++row) {
-      ui->tablePendentes->openPersistentEditor(row, "status");
-      ui->tablePendentes->openPersistentEditor(row, "contaDestino");
-      ui->tablePendentes->openPersistentEditor(row, "centroCusto");
-    }
-
-    //
-
-    modelProcessados.setFilter(idVenda.isEmpty() ? "idPagamento = " + idPagamento + " AND status != 'PENDENTE' AND status != 'CANCELADO' AND status != 'CONFERIDO' AND representacao = FALSE"
-                                                 : "idVenda = '" + idVenda + "' AND status != 'PENDENTE' AND status != 'CANCELADO' AND status != 'CONFERIDO' AND representacao = FALSE");
-
-    if (not modelProcessados.select()) { emit errorSignal("Erro lendo tabela conta_a_receber_has_pagamento: " + modelProcessados.lastError().text()); }
-
-    for (int row = 0, rowCount = modelProcessados.rowCount(); row < rowCount; ++row) {
-      ui->tableProcessados->openPersistentEditor(row, "contaDestino");
-      ui->tableProcessados->openPersistentEditor(row, "centroCusto");
-    }
-
-    ui->tableProcessados->resizeColumnsToContents();
+    modelProcessados.setFilter(idVenda.isEmpty() ? "idPagamento = " + idPagamento + " AND status NOT IN ('PENDENTE', 'CANCELADO', 'CONFERIDO') AND representacao = FALSE"
+                                                 : "idVenda = '" + idVenda + "' AND status NOT IN ('PENDENTE', 'CANCELADO', 'CONFERIDO') AND representacao = FALSE");
   }
 
   if (tipo == Tipo::Pagar) {
@@ -344,48 +268,27 @@ void Contas::viewConta(const QString &idPagamento, const QString &contraparte) {
     query.prepare("SELECT cp.idCompra, pf.ordemCompra FROM conta_a_pagar_has_pagamento cp LEFT JOIN pedido_fornecedor_has_produto pf ON cp.idCompra = pf.idCompra WHERE idPagamento = :idPagamento");
     query.bindValue(":idPagamento", idPagamento);
 
-    if (not query.exec() or not query.first()) {
-      emit errorSignal("Erro buscando dados: " + query.lastError().text());
-      return;
-    }
+    if (not query.exec() or not query.first()) { return qApp->enqueueError("Erro buscando dados: " + query.lastError().text(), this); }
 
     const QString idCompra = query.value("idCompra").toString();
     const QString ordemCompra = query.value("ordemCompra").toString();
 
     setWindowTitle("Contas A Pagar - " + contraparte + (ordemCompra == "0" ? "" : " OC " + ordemCompra));
 
-    modelPendentes.setFilter(idCompra == "0" ? "idPagamento = " + idPagamento + " AND (status = 'PENDENTE' OR status = 'CONFERIDO')"
-                                             : "idCompra = '" + idCompra + "' AND (status = 'PENDENTE' OR status = 'CONFERIDO')");
+    modelPendentes.setFilter(idCompra == "0" ? "idPagamento = " + idPagamento + " AND status IN ('PENDENTE', 'CONFERIDO')" : "idCompra = '" + idCompra + "' AND status IN ('PENDENTE', 'CONFERIDO')");
 
-    if (not modelPendentes.select()) emit errorSignal("Erro lendo tabela conta_a_receber_has_pagamento: " + modelPendentes.lastError().text());
+    // -------------------------------------------------------------------------
 
-    ui->tablePendentes->resizeColumnsToContents();
-
-    for (int row = 0, rowCount = modelPendentes.rowCount(); row < rowCount; ++row) {
-      ui->tablePendentes->openPersistentEditor(row, "status");
-      ui->tablePendentes->openPersistentEditor(row, "contaDestino");
-      ui->tablePendentes->openPersistentEditor(row, "centroCusto");
-    }
-
-    //
-
-    modelProcessados.setFilter(idCompra == "0" ? "idPagamento = " + idPagamento + " AND status != 'PENDENTE' AND status != 'CANCELADO' AND status != 'CONFERIDO'"
-                                               : "idCompra = '" + idCompra + "' AND status != 'PENDENTE' AND status != 'CANCELADO' AND status != 'CONFERIDO'");
-
-    if (not modelProcessados.select()) emit errorSignal("Erro lendo tabela conta_a_receber_has_pagamento: " + modelProcessados.lastError().text());
-
-    for (int row = 0, rowCount = modelProcessados.rowCount(); row < rowCount; ++row) {
-      ui->tableProcessados->openPersistentEditor(row, "contaDestino");
-      ui->tableProcessados->openPersistentEditor(row, "centroCusto");
-    }
-
-    ui->tableProcessados->resizeColumnsToContents();
+    modelProcessados.setFilter(idCompra == "0" ? "idPagamento = " + idPagamento + " AND status NOT IN ('PENDENTE', 'CANCELADO', 'CONFERIDO')"
+                                               : "idCompra = " + idCompra + " AND status NOT IN ('PENDENTE', 'CANCELADO', 'CONFERIDO')");
   }
+
+  if (not modelPendentes.select()) { return; }
+
+  // -------------------------------------------------------------------------
+
+  if (not modelProcessados.select()) { return; }
 }
-
-void Contas::on_tablePendentes_entered(const QModelIndex &) { ui->tablePendentes->resizeColumnsToContents(); }
-
-void Contas::on_tableProcessados_entered(const QModelIndex &) { ui->tableProcessados->resizeColumnsToContents(); }
 
 // TODO: 5adicionar coluna 'boleto' para dizer onde foi pago
 // TODO: 5fazer somatoria dos valores

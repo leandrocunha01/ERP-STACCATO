@@ -1,14 +1,14 @@
-#ifndef PAGAMENTOSDIA_H
-#define PAGAMENTOSDIA_H
+#pragma once
 
-#include "dialog.h"
+#include <QDialog>
+
 #include "sqlrelationaltablemodel.h"
 
 namespace Ui {
 class PagamentosDia;
 }
 
-class PagamentosDia final : public Dialog {
+class PagamentosDia final : public QDialog {
   Q_OBJECT
 
 public:
@@ -17,10 +17,9 @@ public:
   auto setFilter(const QDate &date, const QString &idConta) -> bool;
 
 private:
+  // attributes
   SqlRelationalTableModel modelViewFluxoCaixa;
   Ui::PagamentosDia *ui;
-  //
+  // methods
   auto setupTables() -> void;
 };
-
-#endif // PAGAMENTOSDIA_H

@@ -1,6 +1,7 @@
 #include <QDebug>
 #include <QSqlError>
 
+#include "application.h"
 #include "followup.h"
 #include "orcamento.h"
 #include "orcamentoproxymodel.h"
@@ -9,44 +10,43 @@
 #include "usersession.h"
 #include "widgetorcamento.h"
 
-WidgetOrcamento::WidgetOrcamento(QWidget *parent) : Widget(parent), ui(new Ui::WidgetOrcamento) {
-  ui->setupUi(this);
-
-  connect(ui->comboBoxLojas, QOverload<int>::of(&ComboBox::currentIndexChanged), this, &WidgetOrcamento::on_comboBoxLojas_currentIndexChanged);
-  connect(ui->groupBoxStatus, &QGroupBox::toggled, this, &WidgetOrcamento::on_groupBoxStatus_toggled);
-  connect(ui->pushButtonCriarOrc, &QPushButton::clicked, this, &WidgetOrcamento::on_pushButtonCriarOrc_clicked);
-  connect(ui->pushButtonFollowup, &QPushButton::clicked, this, &WidgetOrcamento::on_pushButtonFollowup_clicked);
-  connect(ui->table, &TableView::activated, this, &WidgetOrcamento::on_table_activated);
-  connect(ui->table, &TableView::entered, this, &WidgetOrcamento::on_table_entered);
-}
+WidgetOrcamento::WidgetOrcamento(QWidget *parent) : QWidget(parent), ui(new Ui::WidgetOrcamento) { ui->setupUi(this); }
 
 WidgetOrcamento::~WidgetOrcamento() { delete ui; }
 
 void WidgetOrcamento::setPermissions() {
-  if (UserSession::tipoUsuario() == "ADMINISTRADOR" or UserSession::tipoUsuario() == "DIRETOR") {
-    QSqlQuery query("SELECT descricao, idLoja FROM loja WHERE desativado = FALSE");
+  const QString tipoUsuario = UserSession::tipoUsuario();
 
-    while (query.next()) ui->comboBoxLojas->addItem(query.value("descricao").toString(), query.value("idLoja"));
+  if (tipoUsuario == "ADMINISTRADOR" or tipoUsuario == "DIRETOR") {
+    QSqlQuery query;
 
-    ui->comboBoxLojas->setCurrentValue(UserSession::idLoja());
+    if (not query.exec("SELECT descricao, idLoja FROM loja WHERE desativado = FALSE")) { return; }
+
+    while (query.next()) { ui->comboBoxLojas->addItem(query.value("descricao").toString(), query.value("idLoja")); }
 
     ui->groupBoxMes->setChecked(true);
   }
 
-  if (UserSession::tipoUsuario() == "GERENTE LOJA") {
+  if (tipoUsuario == "GERENTE LOJA") {
     ui->groupBoxLojas->hide();
 
-    QSqlQuery query("SELECT idUsuario, user FROM usuario WHERE desativado = FALSE AND idLoja = " + QString::number(UserSession::idLoja()));
+    ui->comboBoxVendedores->clear();
+
+    QSqlQuery query;
+
+    if (not query.exec("SELECT idUsuario, user FROM usuario WHERE desativado = FALSE AND idLoja = " + QString::number(UserSession::idLoja()) + " ORDER BY nome")) { return; }
 
     ui->comboBoxVendedores->addItem("");
 
-    while (query.next()) ui->comboBoxVendedores->addItem(query.value("user").toString(), query.value("idUsuario"));
+    while (query.next()) { ui->comboBoxVendedores->addItem(query.value("user").toString(), query.value("idUsuario")); }
   }
 
-  if (UserSession::tipoUsuario() == "VENDEDOR") {
-    QSqlQuery query("SELECT descricao, idLoja FROM loja WHERE desativado = FALSE");
+  if (tipoUsuario == "VENDEDOR" or tipoUsuario == "VENDEDOR ESPECIAL") {
+    QSqlQuery query;
 
-    while (query.next()) ui->comboBoxLojas->addItem(query.value("descricao").toString(), query.value("idLoja"));
+    if (not query.exec("SELECT descricao, idLoja FROM loja WHERE desativado = FALSE")) { return; }
+
+    while (query.next()) { ui->comboBoxLojas->addItem(query.value("descricao").toString(), query.value("idLoja")); }
 
     ui->radioButtonProprios->click();
     ui->checkBoxValido->setChecked(true);
@@ -57,53 +57,88 @@ void WidgetOrcamento::setPermissions() {
     ui->radioButtonTodos->click();
   }
 
+  ui->comboBoxLojas->setCurrentValue(UserSession::idLoja());
+
   ui->dateEdit->setDate(QDate::currentDate());
 }
 
 void WidgetOrcamento::setupTables() {
-  modelViewOrcamento.setTable("view_orcamento"); // REFAC: 5refactor other querys that use 'find last of'
+  modelViewOrcamento.setTable("view_orcamento");
 
-  ui->table->setModel(new OrcamentoProxyModel(&modelViewOrcamento, this));
+  modelViewOrcamento.proxyModel = new OrcamentoProxyModel(&modelViewOrcamento, this);
+
+  ui->table->setModel(&modelViewOrcamento);
+
   ui->table->setItemDelegateForColumn("Total", new ReaisDelegate(this));
+
   ui->table->hideColumn("idLoja");
   ui->table->hideColumn("idUsuario");
-
-  if (UserSession::tipoUsuario() != "VENDEDOR ESPECIAL") ui->table->hideColumn("Indicou");
+  ui->table->hideColumn("idUsuarioConsultor");
+  ui->table->hideColumn("semaforo");
 }
 
-void WidgetOrcamento::setupConnections() {
-  connect(ui->checkBoxCancelado, &QAbstractButton::toggled, this, &WidgetOrcamento::montaFiltro);
-  connect(ui->checkBoxExpirado, &QAbstractButton::toggled, this, &WidgetOrcamento::montaFiltro);
-  connect(ui->checkBoxFechado, &QAbstractButton::toggled, this, &WidgetOrcamento::montaFiltro);
-  connect(ui->checkBoxPerdido, &QCheckBox::toggled, this, &WidgetOrcamento::montaFiltro);
-  connect(ui->checkBoxReplicado, &QCheckBox::toggled, this, &WidgetOrcamento::montaFiltro);
-  connect(ui->checkBoxValido, &QAbstractButton::toggled, this, &WidgetOrcamento::montaFiltro);
-  connect(ui->comboBoxLojas, &QComboBox::currentTextChanged, this, &WidgetOrcamento::montaFiltro);
-  connect(ui->comboBoxVendedores, &QComboBox::currentTextChanged, this, &WidgetOrcamento::montaFiltro);
-  connect(ui->dateEdit, &QDateEdit::dateChanged, this, &WidgetOrcamento::montaFiltro);
-  connect(ui->groupBoxMes, &QGroupBox::toggled, this, &WidgetOrcamento::montaFiltro);
-  connect(ui->lineEditBusca, &QLineEdit::textChanged, this, &WidgetOrcamento::montaFiltro);
-  connect(ui->radioButtonProprios, &QAbstractButton::toggled, this, &WidgetOrcamento::montaFiltro);
-  connect(ui->radioButtonTodos, &QAbstractButton::toggled, this, &WidgetOrcamento::montaFiltro);
+void WidgetOrcamento::setConnections() {
+  const auto connectionType = static_cast<Qt::ConnectionType>(Qt::AutoConnection | Qt::UniqueConnection);
+
+  connect(ui->checkBoxCancelado, &QAbstractButton::toggled, this, &WidgetOrcamento::montaFiltro, connectionType);
+  connect(ui->checkBoxExpirado, &QAbstractButton::toggled, this, &WidgetOrcamento::montaFiltro, connectionType);
+  connect(ui->checkBoxFechado, &QAbstractButton::toggled, this, &WidgetOrcamento::montaFiltro, connectionType);
+  connect(ui->checkBoxPerdido, &QCheckBox::toggled, this, &WidgetOrcamento::montaFiltro, connectionType);
+  connect(ui->checkBoxReplicado, &QCheckBox::toggled, this, &WidgetOrcamento::montaFiltro, connectionType);
+  connect(ui->checkBoxValido, &QAbstractButton::toggled, this, &WidgetOrcamento::montaFiltro, connectionType);
+  connect(ui->comboBoxLojas, &QComboBox::currentTextChanged, this, &WidgetOrcamento::montaFiltro, connectionType);
+  connect(ui->comboBoxLojas, qOverload<int>(&ComboBox::currentIndexChanged), this, &WidgetOrcamento::on_comboBoxLojas_currentIndexChanged, connectionType);
+  connect(ui->comboBoxVendedores, &QComboBox::currentTextChanged, this, &WidgetOrcamento::montaFiltro, connectionType);
+  connect(ui->dateEdit, &QDateEdit::dateChanged, this, &WidgetOrcamento::montaFiltro, connectionType);
+  connect(ui->groupBoxMes, &QGroupBox::toggled, this, &WidgetOrcamento::montaFiltro, connectionType);
+  connect(ui->groupBoxStatus, &QGroupBox::toggled, this, &WidgetOrcamento::on_groupBoxStatus_toggled, connectionType);
+  connect(ui->lineEditBusca, &QLineEdit::textChanged, this, &WidgetOrcamento::montaFiltro, connectionType);
+  connect(ui->pushButtonCriarOrc, &QPushButton::clicked, this, &WidgetOrcamento::on_pushButtonCriarOrc_clicked, connectionType);
+  connect(ui->pushButtonFollowup, &QPushButton::clicked, this, &WidgetOrcamento::on_pushButtonFollowup_clicked, connectionType);
+  connect(ui->radioButtonProprios, &QAbstractButton::toggled, this, &WidgetOrcamento::montaFiltro, connectionType);
+  connect(ui->radioButtonTodos, &QAbstractButton::toggled, this, &WidgetOrcamento::montaFiltro, connectionType);
+  connect(ui->table, &TableView::activated, this, &WidgetOrcamento::on_table_activated, connectionType);
 }
 
-bool WidgetOrcamento::updateTables() {
-  if (modelViewOrcamento.tableName().isEmpty()) {
+void WidgetOrcamento::unsetConnections() {
+  disconnect(ui->checkBoxCancelado, &QAbstractButton::toggled, this, &WidgetOrcamento::montaFiltro);
+  disconnect(ui->checkBoxExpirado, &QAbstractButton::toggled, this, &WidgetOrcamento::montaFiltro);
+  disconnect(ui->checkBoxFechado, &QAbstractButton::toggled, this, &WidgetOrcamento::montaFiltro);
+  disconnect(ui->checkBoxPerdido, &QCheckBox::toggled, this, &WidgetOrcamento::montaFiltro);
+  disconnect(ui->checkBoxReplicado, &QCheckBox::toggled, this, &WidgetOrcamento::montaFiltro);
+  disconnect(ui->checkBoxValido, &QAbstractButton::toggled, this, &WidgetOrcamento::montaFiltro);
+  disconnect(ui->comboBoxLojas, &QComboBox::currentTextChanged, this, &WidgetOrcamento::montaFiltro);
+  disconnect(ui->comboBoxLojas, qOverload<int>(&ComboBox::currentIndexChanged), this, &WidgetOrcamento::on_comboBoxLojas_currentIndexChanged);
+  disconnect(ui->comboBoxVendedores, &QComboBox::currentTextChanged, this, &WidgetOrcamento::montaFiltro);
+  disconnect(ui->dateEdit, &QDateEdit::dateChanged, this, &WidgetOrcamento::montaFiltro);
+  disconnect(ui->groupBoxMes, &QGroupBox::toggled, this, &WidgetOrcamento::montaFiltro);
+  disconnect(ui->groupBoxStatus, &QGroupBox::toggled, this, &WidgetOrcamento::on_groupBoxStatus_toggled);
+  disconnect(ui->lineEditBusca, &QLineEdit::textChanged, this, &WidgetOrcamento::montaFiltro);
+  disconnect(ui->pushButtonCriarOrc, &QPushButton::clicked, this, &WidgetOrcamento::on_pushButtonCriarOrc_clicked);
+  disconnect(ui->pushButtonFollowup, &QPushButton::clicked, this, &WidgetOrcamento::on_pushButtonFollowup_clicked);
+  disconnect(ui->radioButtonProprios, &QAbstractButton::toggled, this, &WidgetOrcamento::montaFiltro);
+  disconnect(ui->radioButtonTodos, &QAbstractButton::toggled, this, &WidgetOrcamento::montaFiltro);
+  disconnect(ui->table, &TableView::activated, this, &WidgetOrcamento::on_table_activated);
+}
+
+void WidgetOrcamento::updateTables() {
+  if (not isSet) {
+    on_comboBoxLojas_currentIndexChanged();
     setPermissions();
+    setConnections();
+    isSet = true;
+  }
+
+  if (not modelIsSet) {
     setupTables();
     montaFiltro();
-    setupConnections();
+    modelIsSet = true;
   }
 
-  if (not modelViewOrcamento.select()) {
-    emit errorSignal("Erro lendo tabela orçamento: " + modelViewOrcamento.lastError().text());
-    return false;
-  }
-
-  ui->table->resizeColumnsToContents();
-
-  return true;
+  if (not modelViewOrcamento.select()) { return; }
 }
+
+void WidgetOrcamento::resetTables() { modelIsSet = false; }
 
 void WidgetOrcamento::on_table_activated(const QModelIndex &index) {
   auto *orcamento = new Orcamento(this);
@@ -121,45 +156,66 @@ void WidgetOrcamento::on_pushButtonCriarOrc_clicked() {
 }
 
 void WidgetOrcamento::montaFiltro() {
-  const auto siglaLoja = UserSession::fromLoja("sigla");
+  QStringList filtros;
 
-  QString filtroLoja =
-      ui->comboBoxLojas->currentText().isEmpty() ? "(Código LIKE '%" + (siglaLoja ? siglaLoja.value().toString() : QString()) + "%')" : "idLoja = " + ui->comboBoxLojas->getCurrentValue().toString();
+  QString filtroLoja;
 
-  const QString filtroRadio = ui->radioButtonTodos->isChecked() ? "" : " AND Vendedor = '" + UserSession::nome() + "'";
-
-  QString filtroCheck;
-
-  Q_FOREACH (const auto &child, ui->groupBoxStatus->findChildren<QCheckBox *>()) {
-    if (child->isChecked()) { filtroCheck += filtroCheck.isEmpty() ? "status = '" + child->text().toUpper() + "'" : " OR status = '" + child->text().toUpper() + "'"; }
+  if (const auto tipoUsuario = UserSession::tipoUsuario(); not ui->comboBoxLojas->currentText().isEmpty()) {
+    filtroLoja = "idLoja = " + ui->comboBoxLojas->getCurrentValue().toString();
+  } else if (tipoUsuario == "ADMINISTRADOR" or tipoUsuario == "ADMINISTRATIVO" or tipoUsuario == "DIRETOR" or tipoUsuario == "GERENTE DEPARTAMENTO" or tipoUsuario == "VENDEDOR ESPECIAL") {
+    filtroLoja = "";
+  } else if (tipoUsuario == "GERENTE LOJA" or tipoUsuario == "VENDEDOR") {
+    const auto siglaLoja = UserSession::fromLoja("sigla");
+    const auto sigla = siglaLoja ? siglaLoja.value().toString() : "";
+    filtroLoja = "(Código LIKE '%" + sigla + "%')";
   }
 
-  filtroCheck = filtroCheck.isEmpty() ? "" : " AND (" + filtroCheck + ")";
+  if (not filtroLoja.isEmpty()) { filtros << filtroLoja; }
 
-  const QString filtroData = ui->groupBoxMes->isChecked() ? " AND DATE_FORMAT(Data, '%Y-%m') = '" + ui->dateEdit->date().toString("yyyy-MM") + "'" : "";
+  //-------------------------------------
 
-  const QString filtroVendedor = ui->comboBoxVendedores->currentText().isEmpty() ? "" : " AND idUsuario = " + ui->comboBoxVendedores->getCurrentValue().toString();
+  const QString filtroData = ui->groupBoxMes->isChecked() ? "DATE_FORMAT(Data, '%Y-%m') = '" + ui->dateEdit->date().toString("yyyy-MM") + "'" : "";
+  if (not filtroData.isEmpty()) { filtros << filtroData; }
+
+  //-------------------------------------
+
+  const QString idVendedor = ui->comboBoxVendedores->getCurrentValue().toString();
+  const QString filtroVendedor = ui->comboBoxVendedores->currentText().isEmpty() ? "" : "(idUsuario = " + idVendedor + " OR idUsuarioConsultor = " + idVendedor + ")";
+  if (not filtroVendedor.isEmpty()) { filtros << filtroVendedor; }
+
+  //-------------------------------------
+
+  const QString filtroRadio = ui->radioButtonTodos->isChecked() ? "" : "(Vendedor = '" + UserSession::nome() + "'" + " OR Consultor = '" + UserSession::nome() + "')";
+  if (not filtroRadio.isEmpty()) { filtros << filtroRadio; }
+
+  //-------------------------------------
+
+  QStringList filtroCheck;
+
+  const auto children = ui->groupBoxStatus->findChildren<QCheckBox *>();
+
+  for (const auto &child : children) {
+    if (child->isChecked()) { filtroCheck << "'" + child->text().toUpper() + "'"; }
+  }
+
+  if (not filtroCheck.isEmpty()) { filtros << "status IN (" + filtroCheck.join(", ") + ")"; }
+
+  //-------------------------------------
 
   const QString textoBusca = ui->lineEditBusca->text();
+  const QString filtroBusca = "(Código LIKE '%" + textoBusca + "%' OR Vendedor LIKE '%" + textoBusca + "%' OR Cliente LIKE '%" + textoBusca + "%' OR Profissional LIKE '%" + textoBusca + "%')";
 
-  const QString filtroBusca =
-      textoBusca.isEmpty() ? ""
-                           : " AND (Código LIKE '%" + textoBusca + "%' OR Vendedor LIKE '%" + textoBusca + "%' OR Cliente LIKE '%" + textoBusca + "%' OR Profissional LIKE '%" + textoBusca + "%')";
+  if (not textoBusca.isEmpty()) { filtros << filtroBusca; }
 
-  modelViewOrcamento.setFilter(filtroLoja + filtroData + filtroVendedor + filtroRadio + filtroCheck + filtroBusca);
+  //-------------------------------------
 
-  ui->table->resizeColumnsToContents();
+  modelViewOrcamento.setFilter(filtros.join(" AND "));
 }
-
-void WidgetOrcamento::on_table_entered(const QModelIndex &) { ui->table->resizeColumnsToContents(); }
 
 void WidgetOrcamento::on_pushButtonFollowup_clicked() {
   const auto list = ui->table->selectionModel()->selectedRows();
 
-  if (list.isEmpty()) {
-    emit errorSignal("Nenhuma linha selecionada!");
-    return;
-  }
+  if (list.isEmpty()) { return qApp->enqueueError("Nenhuma linha selecionada!", this); }
 
   FollowUp *followup = new FollowUp(modelViewOrcamento.data(list.first().row(), "Código").toString(), FollowUp::Tipo::Orcamento, this);
   followup->setAttribute(Qt::WA_DeleteOnClose);
@@ -167,22 +223,49 @@ void WidgetOrcamento::on_pushButtonFollowup_clicked() {
 }
 
 void WidgetOrcamento::on_groupBoxStatus_toggled(const bool enabled) {
-  Q_FOREACH (const auto &child, ui->groupBoxStatus->findChildren<QCheckBox *>()) {
+  unsetConnections();
+
+  const auto children = ui->groupBoxStatus->findChildren<QCheckBox *>();
+
+  for (const auto &child : children) {
     child->setEnabled(true);
     child->setChecked(enabled);
   }
+
+  setConnections();
+
+  montaFiltro();
 }
 
-void WidgetOrcamento::on_comboBoxLojas_currentIndexChanged(const int) {
-  ui->comboBoxVendedores->clear();
+void WidgetOrcamento::on_comboBoxLojas_currentIndexChanged() {
+  unsetConnections();
 
-  QSqlQuery query("SELECT idUsuario, user FROM usuario WHERE desativado = FALSE AND tipo = 'VENDEDOR'" +
-                  (ui->comboBoxLojas->currentText().isEmpty() ? "" : " AND idLoja = " + ui->comboBoxLojas->getCurrentValue().toString()));
+  [&] {
+    ui->comboBoxVendedores->clear();
 
-  ui->comboBoxVendedores->addItem("");
+    const QString filtroLoja = ui->comboBoxLojas->currentText().isEmpty() ? "" : " AND idLoja = " + ui->comboBoxLojas->getCurrentValue().toString();
 
-  while (query.next()) ui->comboBoxVendedores->addItem(query.value("user").toString(), query.value("idUsuario"));
+    QSqlQuery query;
+
+    if (not query.exec("SELECT idUsuario, nome FROM usuario WHERE desativado = FALSE AND tipo IN ('VENDEDOR', 'VENDEDOR ESPECIAL')" + filtroLoja + " ORDER BY nome")) { return; }
+
+    ui->comboBoxVendedores->addItem("");
+
+    while (query.next()) { ui->comboBoxVendedores->addItem(query.value("nome").toString(), query.value("idUsuario")); }
+
+    const QString tipoUsuario = UserSession::tipoUsuario();
+
+    if (tipoUsuario == "VENDEDOR") {
+      const int currentLoja = UserSession::idLoja();
+
+      if (currentLoja != ui->comboBoxLojas->getCurrentValue()) {
+        ui->radioButtonTodos->setDisabled(true);
+        ui->radioButtonProprios->setChecked(true);
+      } else {
+        ui->radioButtonTodos->setEnabled(true);
+      }
+    }
+  }();
+
+  setConnections();
 }
-
-// TODO: 1por padrao nao ativar filtro mes quando for vendedor (acho que já foi feito)
-// TODO: 5alterar followup para guardar apenas os 12 primeiros caracteres (remover -RevXXX)

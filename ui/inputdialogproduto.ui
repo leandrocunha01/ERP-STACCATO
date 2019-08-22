@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>636</width>
-    <height>428</height>
+    <width>787</width>
+    <height>403</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -164,6 +164,13 @@
           </widget>
          </item>
          <item>
+          <widget class="QLineEdit" name="lineEditCodRep">
+           <property name="placeholderText">
+            <string>Cód. Rep.</string>
+           </property>
+          </widget>
+         </item>
+         <item>
           <spacer name="horizontalSpacer_6">
            <property name="orientation">
             <enum>Qt::Horizontal</enum>
@@ -195,6 +202,9 @@
         </property>
         <property name="selectionBehavior">
          <enum>QAbstractItemView::SelectRows</enum>
+        </property>
+        <property name="sortingEnabled">
+         <bool>true</bool>
         </property>
        </widget>
       </item>

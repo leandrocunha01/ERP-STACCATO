@@ -326,81 +326,64 @@ void ReportDesignWindow::createBandsButton() {
   m_newBandButton->setIcon(QIcon(":/report/images/addBand"));
   m_newBandButton->setToolTip(tr("Report bands"));
 
-  m_bandsAddSignalsMap = new QSignalMapper(this);
-
   m_newReportHeader = new QAction(QIcon(), tr("Report Header"), this);
-  connect(m_newReportHeader, SIGNAL(triggered()), m_bandsAddSignalsMap, SLOT(map()));
-  m_bandsAddSignalsMap->setMapping(m_newReportHeader, BandDesignIntf::ReportHeader);
+  connect(m_newReportHeader, &QAction::triggered, [this] { slotNewBand(BandDesignIntf::ReportHeader); });
   m_newBandButton->addAction(m_newReportHeader);
 
   m_newReportFooter = new QAction(QIcon(), tr("Report Footer"), this);
-  connect(m_newReportFooter, SIGNAL(triggered()), m_bandsAddSignalsMap, SLOT(map()));
-  m_bandsAddSignalsMap->setMapping(m_newReportFooter, BandDesignIntf::ReportFooter);
+  connect(m_newReportFooter, &QAction::triggered, [this] { slotNewBand(BandDesignIntf::ReportFooter); });
   m_newBandButton->addAction(m_newReportFooter);
 
   m_newPageHeader = new QAction(QIcon(), tr("Page Header"), this);
-  connect(m_newPageHeader, SIGNAL(triggered()), m_bandsAddSignalsMap, SLOT(map()));
-  m_bandsAddSignalsMap->setMapping(m_newPageHeader, BandDesignIntf::PageHeader);
+  connect(m_newPageHeader, &QAction::triggered, [this] { slotNewBand(BandDesignIntf::PageHeader); });
   m_newBandButton->addAction(m_newPageHeader);
 
   m_newPageFooter = new QAction(QIcon(), tr("Page Footer"), this);
-  connect(m_newPageFooter, SIGNAL(triggered()), m_bandsAddSignalsMap, SLOT(map()));
-  m_bandsAddSignalsMap->setMapping(m_newPageFooter, BandDesignIntf::PageFooter);
+  connect(m_newPageFooter, &QAction::triggered, [this] { slotNewBand(BandDesignIntf::PageFooter); });
   m_newBandButton->addAction(m_newPageFooter);
 
   m_newData = new QAction(QIcon(), tr("Data"), this);
-  connect(m_newData, SIGNAL(triggered()), m_bandsAddSignalsMap, SLOT(map()));
-  m_bandsAddSignalsMap->setMapping(m_newData, BandDesignIntf::Data);
+  connect(m_newData, &QAction::triggered, [this] { slotNewBand(BandDesignIntf::Data); });
   m_newBandButton->addAction(m_newData);
 
   m_newDataHeader = new QAction(QIcon(), tr("Data Header"), this);
   m_newDataHeader->setEnabled(false);
-  connect(m_newDataHeader, SIGNAL(triggered()), m_bandsAddSignalsMap, SLOT(map()));
-  m_bandsAddSignalsMap->setMapping(m_newDataHeader, BandDesignIntf::DataHeader);
+  connect(m_newDataHeader, &QAction::triggered, [this] { slotNewBand(BandDesignIntf::DataHeader); });
   m_newBandButton->addAction(m_newDataHeader);
 
   m_newDataFooter = new QAction(QIcon(), tr("Data Footer"), this);
   m_newDataFooter->setEnabled(false);
-  connect(m_newDataFooter, SIGNAL(triggered()), m_bandsAddSignalsMap, SLOT(map()));
-  m_bandsAddSignalsMap->setMapping(m_newDataFooter, BandDesignIntf::DataFooter);
+  connect(m_newDataFooter, &QAction::triggered, [this] { slotNewBand(BandDesignIntf::DataFooter); });
   m_newBandButton->addAction(m_newDataFooter);
 
   m_newSubDetail = new QAction(QIcon(), tr("SubDetail"), this);
   m_newSubDetail->setEnabled(false);
-  connect(m_newSubDetail, SIGNAL(triggered()), m_bandsAddSignalsMap, SLOT(map()));
-  m_bandsAddSignalsMap->setMapping(m_newSubDetail, BandDesignIntf::SubDetailBand);
+  connect(m_newSubDetail, &QAction::triggered, [this] { slotNewBand(BandDesignIntf::SubDetailBand); });
   m_newBandButton->addAction(m_newSubDetail);
 
   m_newSubDetailHeader = new QAction(QIcon(), tr("SubDetailHeader"), this);
   m_newSubDetailHeader->setEnabled(false);
-  connect(m_newSubDetailHeader, SIGNAL(triggered()), m_bandsAddSignalsMap, SLOT(map()));
-  m_bandsAddSignalsMap->setMapping(m_newSubDetailHeader, BandDesignIntf::SubDetailHeader);
+  connect(m_newSubDetailHeader, &QAction::triggered, [this] { slotNewBand(BandDesignIntf::SubDetailHeader); });
   m_newBandButton->addAction(m_newSubDetailHeader);
 
   m_newSubDetailFooter = new QAction(QIcon(), tr("SubDetailFooter"), this);
   m_newSubDetailFooter->setEnabled(false);
-  connect(m_newSubDetailFooter, SIGNAL(triggered()), m_bandsAddSignalsMap, SLOT(map()));
-  m_bandsAddSignalsMap->setMapping(m_newSubDetailFooter, BandDesignIntf::SubDetailFooter);
+  connect(m_newSubDetailFooter, &QAction::triggered, [this] { slotNewBand(BandDesignIntf::SubDetailFooter); });
   m_newBandButton->addAction(m_newSubDetailFooter);
 
   m_newGroupHeader = new QAction(QIcon(), tr("GroupHeader"), this);
   m_newGroupHeader->setEnabled(false);
-  connect(m_newGroupHeader, SIGNAL(triggered()), m_bandsAddSignalsMap, SLOT(map()));
-  m_bandsAddSignalsMap->setMapping(m_newGroupHeader, BandDesignIntf::GroupHeader);
+  connect(m_newGroupHeader, &QAction::triggered, [this] { slotNewBand(BandDesignIntf::GroupHeader); });
   m_newBandButton->addAction(m_newGroupHeader);
 
   m_newGroupFooter = new QAction(QIcon(), tr("GroupFooter"), this);
   m_newGroupFooter->setEnabled(false);
-  connect(m_newGroupFooter, SIGNAL(triggered()), m_bandsAddSignalsMap, SLOT(map()));
-  m_bandsAddSignalsMap->setMapping(m_newGroupFooter, BandDesignIntf::GroupFooter);
+  connect(m_newGroupFooter, &QAction::triggered, [this] { slotNewBand(BandDesignIntf::GroupFooter); });
   m_newBandButton->addAction(m_newGroupFooter);
 
   m_newTearOffBand = new QAction(QIcon(), tr("Tear-off Band"), this);
-  connect(m_newTearOffBand, SIGNAL(triggered()), m_bandsAddSignalsMap, SLOT(map()));
-  m_bandsAddSignalsMap->setMapping(m_newTearOffBand, BandDesignIntf::TearOffBand);
+  connect(m_newTearOffBand, &QAction::triggered, [this] { slotNewBand(BandDesignIntf::TearOffBand); });
   m_newBandButton->addAction(m_newTearOffBand);
-
-  connect(m_bandsAddSignalsMap, SIGNAL(mapped(int)), this, SLOT(slotNewBand(int)));
 }
 
 void ReportDesignWindow::createMainMenu() {
@@ -421,31 +404,28 @@ void ReportDesignWindow::createMainMenu() {
   m_infoMenu = menuBar()->addMenu(tr("Info"));
   m_infoMenu->addAction(m_aboutAction);
   m_recentFilesMenu = m_fileMenu->addMenu(tr("Recent Files"));
-  m_recentFilesSignalMap = new QSignalMapper(this);
-  connect(m_recentFilesSignalMap, SIGNAL(mapped(QString)), this, SLOT(slotLoadRecentFile(QString)));
   m_recentFilesMenu->setDisabled(m_recentFiles.isEmpty());
 }
 
 void ReportDesignWindow::initReportEditor(ReportEnginePrivate *report) {
   m_reportDesignWidget = new ReportDesignWidget(report, this, this);
   setCentralWidget(m_reportDesignWidget);
-  connect(m_reportDesignWidget, SIGNAL(itemSelected(LimeReport::BaseDesignIntf *)), this, SLOT(slotItemSelected(LimeReport::BaseDesignIntf *)));
-  connect(m_reportDesignWidget, SIGNAL(itemPropertyChanged(QString, QString, QVariant, QVariant)), this, SLOT(slotItemPropertyChanged(QString, QString, QVariant, QVariant)));
-  connect(m_reportDesignWidget, SIGNAL(insertModeStarted()), this, SLOT(slotInsertModeStarted()));
-  connect(m_reportDesignWidget, SIGNAL(multiItemSelected()), this, SLOT(slotMultiItemSelected()));
-  connect(m_reportDesignWidget, SIGNAL(itemInserted(LimeReport::PageDesignIntf *, QPointF, QString)), this, SLOT(slotItemInserted(LimeReport::PageDesignIntf *, QPointF, QString)));
-  connect(m_reportDesignWidget, SIGNAL(itemInsertCanceled(QString)), this, SLOT(slotItemInsertCanceled(QString)));
-  connect(m_reportDesignWidget->report(), SIGNAL(datasourceCollectionLoadFinished(QString)), this, SLOT(slotUpdateDataBrowser(QString)));
-  connect(m_reportDesignWidget, SIGNAL(commandHistoryChanged()), this, SLOT(slotCommandHistoryChanged()));
-  connect(m_reportDesignWidget, SIGNAL(activePageChanged()), this, SLOT(slotActivePageChanged()));
-  connect(m_reportDesignWidget, SIGNAL(bandAdded(LimeReport::PageDesignIntf *, LimeReport::BandDesignIntf *)), this, SLOT(slotBandAdded(LimeReport::PageDesignIntf *, LimeReport::BandDesignIntf *)));
-  connect(m_reportDesignWidget, SIGNAL(bandDeleted(LimeReport::PageDesignIntf *, LimeReport::BandDesignIntf *)), this,
-          SLOT(slotBandDeleted(LimeReport::PageDesignIntf *, LimeReport::BandDesignIntf *)));
-  connect(m_reportDesignWidget->report(), SIGNAL(renderStarted()), this, SLOT(renderStarted()));
-  connect(m_reportDesignWidget->report(), SIGNAL(renderPageFinished(int)), this, SLOT(renderPageFinished(int)));
-  connect(m_reportDesignWidget->report(), SIGNAL(renderFinished()), this, SLOT(renderFinished()));
-  connect(m_reportDesignWidget, SIGNAL(pageAdded(PageDesignIntf *)), this, SLOT(slotPageAdded(PageDesignIntf *)));
-  connect(m_reportDesignWidget, SIGNAL(pageDeleted()), this, SLOT(slotPageDeleted()));
+  connect(m_reportDesignWidget, &ReportDesignWidget::itemSelected, this, &ReportDesignWindow::slotItemSelected);
+  connect(m_reportDesignWidget, &ReportDesignWidget::itemPropertyChanged, this, &ReportDesignWindow::slotItemPropertyChanged);
+  connect(m_reportDesignWidget, &ReportDesignWidget::insertModeStarted, this, &ReportDesignWindow::slotInsertModeStarted);
+  connect(m_reportDesignWidget, &ReportDesignWidget::multiItemSelected, this, &ReportDesignWindow::slotMultiItemSelected);
+  connect(m_reportDesignWidget, &ReportDesignWidget::itemInserted, this, &ReportDesignWindow::slotItemInserted);
+  connect(m_reportDesignWidget, &ReportDesignWidget::itemInsertCanceled, this, &ReportDesignWindow::slotItemInsertCanceled);
+  connect(m_reportDesignWidget->report(), &ReportEnginePrivate::datasourceCollectionLoadFinished, this, &ReportDesignWindow::slotUpdateDataBrowser);
+  connect(m_reportDesignWidget, &ReportDesignWidget::commandHistoryChanged, this, &ReportDesignWindow::slotCommandHistoryChanged);
+  connect(m_reportDesignWidget, &ReportDesignWidget::activePageChanged, this, &ReportDesignWindow::slotActivePageChanged);
+  connect(m_reportDesignWidget, &ReportDesignWidget::bandAdded, this, &ReportDesignWindow::slotBandAdded);
+  connect(m_reportDesignWidget, &ReportDesignWidget::bandDeleted, this, &ReportDesignWindow::slotBandDeleted);
+  connect(m_reportDesignWidget->report(), &ReportEnginePrivate::renderStarted, this, &ReportDesignWindow::renderStarted);
+  connect(m_reportDesignWidget->report(), &ReportEnginePrivate::renderPageFinished, this, &ReportDesignWindow::renderPageFinished);
+  connect(m_reportDesignWidget->report(), &ReportEnginePrivate::renderFinished, this, &ReportDesignWindow::renderFinished);
+  connect(m_reportDesignWidget, &ReportDesignWidget::pageAdded, this, &ReportDesignWindow::slotPageAdded);
+  connect(m_reportDesignWidget, &ReportDesignWidget::pageDeleted, this, &ReportDesignWindow::slotPageDeleted);
 }
 
 void ReportDesignWindow::createObjectInspector() {
@@ -556,8 +536,7 @@ void ReportDesignWindow::createRecentFilesMenu() {
     removeNotExistedRecentFiles();
     for (QString fileName : m_recentFiles.keys()) {
       QAction *tmpAction = new QAction(QIcon(":/report/images/newReport"), fileName, this);
-      connect(tmpAction, &QAction::triggered, m_recentFilesSignalMap, QOverload<>::of(&QSignalMapper::map));
-      m_recentFilesSignalMap->setMapping(tmpAction, fileName);
+      connect(tmpAction, &QAction::triggered, [&] { slotLoadRecentFile(fileName); });
       m_recentFilesMenu->addAction(tmpAction);
     }
     m_recentFilesMenu->setDisabled(m_recentFiles.isEmpty());
@@ -610,25 +589,21 @@ void ReportDesignWindow::restoreSetting() {
   if (v.isValid()) {
     restoreGeometry(v.toByteArray());
   } else {
-    QDesktopWidget *desktop = QApplication::desktop();
+    QScreen *screen = QGuiApplication::screens().first();
 
-    int screenWidth = desktop->screenGeometry().width();
-    int screenHeight = desktop->screenGeometry().height();
+    int screenWidth = screen->availableGeometry().width();
+    int screenHeight = screen->availableGeometry().height();
 
-    int x = screenWidth * 0.1;
-    int y = screenHeight * 0.1;
+    int x = static_cast<int>(screenWidth * 0.1);
+    int y = static_cast<int>(screenHeight * 0.1);
 
-    resize(screenWidth * 0.8, screenHeight * 0.8);
+    resize(static_cast<int>(screenWidth * 0.8), static_cast<int>(screenHeight * 0.8));
     move(x, y);
   }
   v = settings()->value("State");
-  if (v.isValid()) {
-    restoreState(v.toByteArray());
-  }
+  if (v.isValid()) { restoreState(v.toByteArray()); }
   v = settings()->value("InspectorFirsColumnWidth");
-  if (v.isValid()) {
-    m_objectInspector->setColumnWidth(0, v.toInt());
-  }
+  if (v.isValid()) { m_objectInspector->setColumnWidth(0, v.toInt()); }
 
   settings()->endGroup();
 
@@ -654,13 +629,11 @@ bool ReportDesignWindow::checkNeedToSave() {
     QMessageBox::StandardButton button =
         QMessageBox::question(this, "", tr("Report has been modified! Do you want save the report?"), QMessageBox::Yes | QMessageBox::No | QMessageBox::Cancel, QMessageBox::Yes);
     switch (button) {
-    case QMessageBox::Cancel:
-      break;
+    case QMessageBox::Cancel: break;
     case QMessageBox::Yes:
       if (!m_reportDesignWidget->save()) break;
       [[fallthrough]];
-    default:
-      return true;
+    default: return true;
     }
     return false;
   }
@@ -708,15 +681,11 @@ void ReportDesignWindow::slotNewReport() {
 }
 
 void ReportDesignWindow::slotNewPage() {
-  if (m_reportDesignWidget) {
-    m_reportDesignWidget->addPage();
-  }
+  if (m_reportDesignWidget) { m_reportDesignWidget->addPage(); }
 }
 
 void ReportDesignWindow::slotDeletePage() {
-  if (m_reportDesignWidget && m_reportDesignWidget->report()->pageCount() > 1) {
-    m_reportDesignWidget->deleteCurrentPage();
-  }
+  if (m_reportDesignWidget && m_reportDesignWidget->report()->pageCount() > 1) { m_reportDesignWidget->deleteCurrentPage(); }
 }
 
 void ReportDesignWindow::slotNewTextItem() {
@@ -759,12 +728,8 @@ void ReportDesignWindow::slotItemSelected(LimeReport::BaseDesignIntf *item) {
     bs << BandDesignIntf::Data << BandDesignIntf::SubDetailBand;
     BandDesignIntf *band = dynamic_cast<BandDesignIntf *>(item);
     if (band) {
-      if (bs.contains(band->bandType())) {
-        m_newSubDetail->setEnabled(true);
-      }
-      if ((band->bandType() == BandDesignIntf::Data) || (band->bandType() == BandDesignIntf::SubDetailBand)) {
-        m_newGroupHeader->setEnabled(true);
-      }
+      if (bs.contains(band->bandType())) { m_newSubDetail->setEnabled(true); }
+      if ((band->bandType() == BandDesignIntf::Data) || (band->bandType() == BandDesignIntf::SubDetailBand)) { m_newGroupHeader->setEnabled(true); }
       if (band->bandType() == BandDesignIntf::GroupHeader) {
         m_newGroupFooter->setEnabled(!band->isConnectedToBand(BandDesignIntf::GroupFooter));
         m_newGroupHeader->setEnabled(!band->isConnectedToBand(BandDesignIntf::GroupHeader));
@@ -792,9 +757,7 @@ void ReportDesignWindow::slotItemPropertyChanged(const QString &objectName, cons
   Q_UNUSED(oldValue)
   Q_UNUSED(newValue)
 
-  if (m_propertyModel->currentObject() && (m_propertyModel->currentObject()->objectName() == objectName)) {
-    m_propertyModel->updateProperty(propertyName);
-  }
+  if (m_propertyModel->currentObject() && (m_propertyModel->currentObject()->objectName() == objectName)) { m_propertyModel->updateProperty(propertyName); }
 }
 
 void ReportDesignWindow::slotMultiItemSelected() {
@@ -947,23 +910,12 @@ void ReportDesignWindow::slotItemActionCliked() {
 void ReportDesignWindow::slotBandAdded(PageDesignIntf *, BandDesignIntf *band) {
   if (band->isUnique()) {
     switch (band->bandType()) {
-    case BandDesignIntf::PageHeader:
-      m_newPageHeader->setDisabled(true);
-      break;
-    case BandDesignIntf::PageFooter:
-      m_newPageFooter->setDisabled(true);
-      break;
-    case BandDesignIntf::ReportHeader:
-      m_newReportHeader->setDisabled(true);
-      break;
-    case BandDesignIntf::ReportFooter:
-      m_newReportFooter->setDisabled(true);
-      break;
-    case BandDesignIntf::TearOffBand:
-      m_newTearOffBand->setDisabled(true);
-      break;
-    default:
-      break;
+    case BandDesignIntf::PageHeader: m_newPageHeader->setDisabled(true); break;
+    case BandDesignIntf::PageFooter: m_newPageFooter->setDisabled(true); break;
+    case BandDesignIntf::ReportHeader: m_newReportHeader->setDisabled(true); break;
+    case BandDesignIntf::ReportFooter: m_newReportFooter->setDisabled(true); break;
+    case BandDesignIntf::TearOffBand: m_newTearOffBand->setDisabled(true); break;
+    default: break;
     }
   }
 }
@@ -971,23 +923,12 @@ void ReportDesignWindow::slotBandAdded(PageDesignIntf *, BandDesignIntf *band) {
 void ReportDesignWindow::slotBandDeleted(PageDesignIntf *, BandDesignIntf *band) {
   if (band->isUnique()) {
     switch (band->bandType()) {
-    case BandDesignIntf::PageHeader:
-      m_newPageHeader->setEnabled(true);
-      break;
-    case BandDesignIntf::PageFooter:
-      m_newPageFooter->setEnabled(true);
-      break;
-    case BandDesignIntf::ReportHeader:
-      m_newReportHeader->setEnabled(true);
-      break;
-    case BandDesignIntf::ReportFooter:
-      m_newReportFooter->setEnabled(true);
-      [[fallthrough]];
-    case BandDesignIntf::TearOffBand:
-      m_newTearOffBand->setEnabled(true);
-      [[fallthrough]];
-    default:
-      break;
+    case BandDesignIntf::PageHeader: m_newPageHeader->setEnabled(true); break;
+    case BandDesignIntf::PageFooter: m_newPageFooter->setEnabled(true); break;
+    case BandDesignIntf::ReportHeader: m_newReportHeader->setEnabled(true); break;
+    case BandDesignIntf::ReportFooter: m_newReportFooter->setEnabled(true); [[fallthrough]];
+    case BandDesignIntf::TearOffBand: m_newTearOffBand->setEnabled(true); [[fallthrough]];
+    default: break;
     }
   }
 }
@@ -1003,23 +944,12 @@ void ReportDesignWindow::updateAvaibleBands() {
 
   for (BandDesignIntf *band : m_reportDesignWidget->activePage()->pageItem()->bands()) {
     switch (band->bandType()) {
-    case BandDesignIntf::PageHeader:
-      m_newPageHeader->setEnabled(false);
-      break;
-    case BandDesignIntf::PageFooter:
-      m_newPageFooter->setEnabled(false);
-      break;
-    case BandDesignIntf::ReportHeader:
-      m_newReportHeader->setEnabled(false);
-      break;
-    case BandDesignIntf::ReportFooter:
-      m_newReportFooter->setEnabled(false);
-      [[fallthrough]];
-    case BandDesignIntf::TearOffBand:
-      m_newTearOffBand->setEnabled(false);
-      [[fallthrough]];
-    default:
-      break;
+    case BandDesignIntf::PageHeader: m_newPageHeader->setEnabled(false); break;
+    case BandDesignIntf::PageFooter: m_newPageFooter->setEnabled(false); break;
+    case BandDesignIntf::ReportHeader: m_newReportHeader->setEnabled(false); break;
+    case BandDesignIntf::ReportFooter: m_newReportFooter->setEnabled(false); [[fallthrough]];
+    case BandDesignIntf::TearOffBand: m_newTearOffBand->setEnabled(false); [[fallthrough]];
+    default: break;
     }
   }
 }
@@ -1058,7 +988,7 @@ void ReportDesignWindow::slotShowAbout() {
 bool ReportDesignWindow::isDockAreaVisible(Qt::DockWidgetArea area) {
   QList<QDockWidget *> dockWidgets = findChildren<QDockWidget *>();
   for (QDockWidget *dw : dockWidgets) {
-    if ((dockWidgetArea(dw) == area) && !dw->isHidden()) return true;
+    if ((dockWidgetArea(dw) == area) && !dw->isHidden()) { return true; }
   }
   return false;
 }

@@ -51,9 +51,7 @@ QScriptValue constructColor(QScriptContext *context, QScriptEngine *engine) {
 namespace LimeReport {
 
 ScriptEngineNode::~ScriptEngineNode() {
-  for (int i = 0; i < m_childs.count(); ++i) {
-    delete m_childs[i];
-  }
+  for (int i = 0; i < m_childs.count(); ++i) { delete m_childs[i]; }
 }
 
 ScriptEngineNode *ScriptEngineNode::addChild(const QString &name, const QString &description, ScriptEngineNode::NodeType type, const QIcon &icon) {
@@ -63,16 +61,12 @@ ScriptEngineNode *ScriptEngineNode::addChild(const QString &name, const QString 
 }
 
 int ScriptEngineNode::row() {
-  if (m_parent) {
-    return m_parent->m_childs.indexOf(const_cast<ScriptEngineNode *>(this));
-  }
+  if (m_parent) { return m_parent->m_childs.indexOf(const_cast<ScriptEngineNode *>(this)); }
   return 0;
 }
 
 void ScriptEngineNode::clear() {
-  for (int i = 0; i < m_childs.count(); ++i) {
-    delete m_childs[i];
-  }
+  for (int i = 0; i < m_childs.count(); ++i) { delete m_childs[i]; }
   m_childs.clear();
 }
 
@@ -134,8 +128,7 @@ QVariant ScriptEngineModel::data(const QModelIndex &index, int role) const {
   case Qt::DecorationRole:
     if (!node) return QIcon();
     return node->icon();
-  default:
-    return QVariant();
+  default: return QVariant();
   }
 }
 
@@ -251,21 +244,21 @@ QScriptValue currencyUSBasedFormat(QScriptContext *pcontext, QScriptEngine *peng
 #endif
 QScriptValue dateFormat(QScriptContext *pcontext, QScriptEngine *pengine) {
   QVariant value = pcontext->argument(0).toVariant();
-  QString format = (pcontext->argumentCount() > 1) ? pcontext->argument(1).toString().toLatin1() : "dd.MM.yyyy";
+  QString format = (pcontext->argumentCount() > 1) ? pcontext->argument(1).toString() : "dd.MM.yyyy";
   QScriptValue res = pengine->newVariant(QLocale().toString(value.toDate(), format));
   return res;
 }
 
 QScriptValue timeFormat(QScriptContext *pcontext, QScriptEngine *pengine) {
   QVariant value = pcontext->argument(0).toVariant();
-  QString format = (pcontext->argumentCount() > 1) ? pcontext->argument(1).toString().toLatin1() : "hh:mm";
+  QString format = (pcontext->argumentCount() > 1) ? pcontext->argument(1).toString() : "hh:mm";
   QScriptValue res = pengine->newVariant(QLocale().toString(value.toTime(), format));
   return res;
 }
 
 QScriptValue dateTimeFormat(QScriptContext *pcontext, QScriptEngine *pengine) {
   QVariant value = pcontext->argument(0).toVariant();
-  QString format = (pcontext->argumentCount() > 1) ? pcontext->argument(1).toString().toLatin1() : "dd.MM.yyyy hh:mm";
+  QString format = (pcontext->argumentCount() > 1) ? pcontext->argument(1).toString() : "dd.MM.yyyy hh:mm";
   QScriptValue res = pengine->newVariant(QLocale().toString(value.toDateTime(), format));
   return res;
 }
@@ -314,9 +307,7 @@ ScriptEngineManager::~ScriptEngineManager() {
 
 bool ScriptEngineManager::isFunctionExists(const QString &functionName) const {
   for (ScriptFunctionDesc desc : m_functions) {
-    if (desc.name.compare(functionName, Qt::CaseInsensitive) == 0) {
-      return true;
-    }
+    if (desc.name.compare(functionName, Qt::CaseInsensitive) == 0) { return true; }
   }
   return false;
 }
@@ -324,17 +315,13 @@ bool ScriptEngineManager::isFunctionExists(const QString &functionName) const {
 void ScriptEngineManager::deleteFunction(const QString &functionsName) {
   QMutableListIterator<ScriptFunctionDesc> it(m_functions);
   while (it.hasNext()) {
-    if (it.next().name.compare(functionsName, Qt::CaseInsensitive) == 0) {
-      it.remove();
-    }
+    if (it.next().name.compare(functionsName, Qt::CaseInsensitive) == 0) { it.remove(); }
   }
 }
 
 bool ScriptEngineManager::containsFunction(const QString &functionName) {
   for (ScriptFunctionDesc funct : m_functions) {
-    if (funct.name.compare(functionName) == 0) {
-      return true;
-    }
+    if (funct.name.compare(functionName) == 0) { return true; }
   }
   return false;
 }
@@ -410,19 +397,13 @@ QString ScriptEngineManager::expandUserVariables(QString context, RenderPass pas
           if (pass == dataManager()->variablePass(variable)) {
             varValue = dataManager()->variable(variable);
             switch (expandType) {
-            case EscapeSymbols:
-              context.replace(rx.cap(0), escapeSimbols(varValue.toString()));
-              break;
-            case NoEscapeSymbols:
-              context.replace(rx.cap(0), varValue.toString());
-              break;
-            case ReplaceHTMLSymbols:
-              context.replace(rx.cap(0), replaceHTMLSymbols(varValue.toString()));
-              break;
+            case EscapeSymbols: context.replace(rx.cap(0), escapeSimbols(varValue.toString())); break;
+            case NoEscapeSymbols: context.replace(rx.cap(0), varValue.toString()); break;
+            case ReplaceHTMLSymbols: context.replace(rx.cap(0), replaceHTMLSymbols(varValue.toString())); break;
             }
             pos = 0;
           }
-        } catch (ReportError e) {
+        } catch (ReportError &e) {
           dataManager()->putError(e.what());
           if (!dataManager()->reportSettings() || dataManager()->reportSettings()->suppressAbsentFieldsAndVarsWarnings())
             context.replace(rx.cap(0), e.what());
@@ -463,11 +444,8 @@ QString ScriptEngineManager::expandDataFields(QString context, ExpandType expand
             case QVariant::String:
             case QVariant::StringList:
             case QVariant::Date:
-            case QVariant::DateTime:
-              fieldValue = "\"" + fieldValue + "\"";
-              break;
-            default:
-              break;
+            case QVariant::DateTime: fieldValue = "\"" + fieldValue + "\""; break;
+            default: break;
             }
           }
         } else {
@@ -550,9 +528,7 @@ QVariant ScriptEngineManager::evaluateScript(const QString &script) {
       QString scriptBody = expandDataFields(scriptExtractor.bodyAt(0), EscapeSymbols, varValue, nullptr);
       scriptBody = expandUserVariables(scriptBody, FirstPass, EscapeSymbols, varValue);
       QScriptValue value = se->evaluate(scriptBody);
-      if (!se->hasUncaughtException()) {
-        return value.toVariant();
-      }
+      if (!se->hasUncaughtException()) { return value.toVariant(); }
     }
   }
   return QVariant();
@@ -622,8 +598,7 @@ bool ScriptExtractor::parse(int &curPos, const State &state) {
         if (isStartFieldLexem(curPos) || isStartVariableLexem(curPos)) skipField(curPos);
       }
       [[fallthrough]];
-    default:
-      break;
+    default: break;
     }
     curPos++;
   }
@@ -663,7 +638,7 @@ bool ScriptExtractor::isStartLexem(int &curPos, QChar value) {
       if (m_context[pos] == value) {
         ls = SignFound;
       } else {
-        if (m_context[pos] != ' ') return false;
+        if (m_context[pos] != ' ') { return false; }
       }
       break;
     case SignFound:
@@ -673,8 +648,7 @@ bool ScriptExtractor::isStartLexem(int &curPos, QChar value) {
       } else if (m_context[pos] != ' ')
         return false;
       [[fallthrough]];
-    default:
-      break;
+    default: break;
     }
     pos++;
   }
@@ -713,7 +687,7 @@ bool ScriptEngineContext::previewDialog(const QString &dialogName) {
 
 bool ScriptEngineContext::containsDialog(const QString &dialogName) {
   for (DialogDescriber::Ptr dialog : m_dialogs) {
-    if (dialog->name() == dialogName) return true;
+    if (dialog->name() == dialogName) { return true; }
   }
   return false;
 }
@@ -767,9 +741,7 @@ QObject *ScriptEngineContext::createElement(const QString &collectionName, const
 
 int ScriptEngineContext::elementsCount(const QString &collectionName) {
 #ifdef HAVE_UI_LOADER
-  if (collectionName.compare("dialogs", Qt::CaseInsensitive) == 0) {
-    return m_dialogs.count();
-  };
+  if (collectionName.compare("dialogs", Qt::CaseInsensitive) == 0) { return m_dialogs.count(); };
 #else
   Q_UNUSED(collectionName)
 #endif
@@ -778,9 +750,7 @@ int ScriptEngineContext::elementsCount(const QString &collectionName) {
 
 QObject *ScriptEngineContext::elementAt(const QString &collectionName, int index) {
 #ifdef HAVE_UI_LOADER
-  if (collectionName.compare("dialogs", Qt::CaseInsensitive) == 0) {
-    return m_dialogs.at(index).data();
-  };
+  if (collectionName.compare("dialogs", Qt::CaseInsensitive) == 0) { return m_dialogs.at(index).data(); };
 #else
   Q_UNUSED(collectionName)
   Q_UNUSED(index)
@@ -810,9 +780,7 @@ QDialog *ScriptEngineContext::findDialog(const QString &dialogName) {
 
 DialogDescriber *ScriptEngineContext::findDialogContainer(const QString &dialogName) {
   for (DialogDescriber::Ptr dialogCont : m_dialogs) {
-    if (dialogCont->name().compare(dialogName, Qt::CaseInsensitive) == 0) {
-      return dialogCont.data();
-    }
+    if (dialogCont->name().compare(dialogName, Qt::CaseInsensitive) == 0) { return dialogCont.data(); }
   }
   return nullptr;
 }

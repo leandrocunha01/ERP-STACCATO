@@ -1,14 +1,14 @@
-#ifndef INSERIRLANCAMENTO_H
-#define INSERIRLANCAMENTO_H
+#pragma once
 
-#include "dialog.h"
+#include <QDialog>
+
 #include "sqlrelationaltablemodel.h"
 
 namespace Ui {
 class InserirLancamento;
 }
 
-class InserirLancamento final : public Dialog {
+class InserirLancamento final : public QDialog {
   Q_OBJECT
 
 public:
@@ -25,9 +25,6 @@ private:
   auto on_pushButtonCriarLancamento_clicked() -> void;
   auto on_pushButtonDuplicarLancamento_clicked() -> void;
   auto on_pushButtonSalvar_clicked() -> void;
-  auto openPersistentEditor() -> void;
   auto setupTables() -> void;
   auto verifyFields() -> bool;
 };
-
-#endif // INSERIRLANCAMENTO_H

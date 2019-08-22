@@ -29,12 +29,14 @@
  ****************************************************************************/
 #include "lrbuttonlineeditor.h"
 #include "lrtextitempropertyeditor.h"
+
 #include <QApplication>
 #include <QDesktopWidget>
 #include <QEvent>
 #include <QFocusEvent>
 #include <QKeyEvent>
 #include <QMessageBox>
+#include <QScreen>
 #include <QStyle>
 
 namespace LimeReport {
@@ -63,7 +65,7 @@ ButtonLineEditor::~ButtonLineEditor() {}
 void ButtonLineEditor::editButtonClicked() {
   TextItemPropertyEditor *editor = new TextItemPropertyEditor(QApplication::activeWindow());
   editor->setAttribute(Qt::WA_DeleteOnClose);
-  editor->setGeometry(QStyle::alignedRect(Qt::LeftToRight, Qt::AlignCenter, editor->size(), QApplication::desktop()->availableGeometry()));
+  editor->setGeometry(QStyle::alignedRect(Qt::LeftToRight, Qt::AlignCenter, editor->size(), QGuiApplication::screens().first()->availableGeometry()));
   editor->setWindowTitle(m_propertyName);
   editor->setText(m_lineEdit->text());
   connect(editor, SIGNAL(accepted()), this, SLOT(editingByEditorFinished()));
@@ -78,16 +80,10 @@ bool ButtonLineEditor::eventFilter(QObject *target, QEvent *event) {
 
   if (target == m_buttonEdit) {
 
-    if (event->type() == QEvent::HoverEnter) {
-      m_overButton = true;
-    }
-    if (event->type() == QEvent::HoverLeave) {
-      m_overButton = false;
-    }
+    if (event->type() == QEvent::HoverEnter) { m_overButton = true; }
+    if (event->type() == QEvent::HoverLeave) { m_overButton = false; }
     if (event->type() == QEvent::FocusOut) {
-      if (static_cast<QFocusEvent *>(event)->reason() != Qt::MouseFocusReason) {
-        m_lineEdit->setFocus();
-      }
+      if (static_cast<QFocusEvent *>(event)->reason() != Qt::MouseFocusReason) { m_lineEdit->setFocus(); }
     }
     QSet<int> enterKeys;
     enterKeys.insert(Qt::Key_Enter);
@@ -103,13 +99,9 @@ bool ButtonLineEditor::eventFilter(QObject *target, QEvent *event) {
   if (target == m_lineEdit) {
     if (event->type() == QEvent::FocusOut) {
       switch (static_cast<QFocusEvent *>(event)->reason()) {
-      case Qt::TabFocusReason:
-        m_overButton = true;
-        break;
-      case Qt::MouseFocusReason:
-        break;
-      default:
-        m_overButton = false;
+      case Qt::TabFocusReason: m_overButton = true; break;
+      case Qt::MouseFocusReason: break;
+      default: m_overButton = false;
       }
     }
   }

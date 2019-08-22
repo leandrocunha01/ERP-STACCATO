@@ -3,6 +3,7 @@
 #include <QFileDialog>
 #include <QSqlError>
 
+#include "application.h"
 #include "porcentagemdelegate.h"
 #include "reaisdelegate.h"
 #include "ui_widgetrelatorio.h"
@@ -10,27 +11,14 @@
 #include "widgetrelatorio.h"
 #include "xlsxdocument.h"
 
-WidgetRelatorio::WidgetRelatorio(QWidget *parent) : Widget(parent), ui(new Ui::WidgetRelatorio) {
-  ui->setupUi(this);
-
-  if (UserSession::tipoUsuario() == "VENDEDOR" or UserSession::tipoUsuario() == "VENDEDOR ESPECIAL") {
-    ui->labelTotalLoja->hide();
-    ui->tableTotalLoja->hide();
-    ui->labelGeral->hide();
-    ui->doubleSpinBoxGeral->hide();
-    ui->groupBoxResumoOrcamento->hide();
-  }
-
-  ui->dateEditMes->setDate(QDate::currentDate());
-
-  connect(ui->dateEditMes, &QDateEdit::dateChanged, this, &WidgetRelatorio::dateEditMes_dateChanged);
-  connect(ui->pushButtonExcel, &QPushButton::clicked, this, &WidgetRelatorio::on_pushButtonExcel_clicked);
-  connect(ui->tableRelatorio, &TableView::entered, this, &WidgetRelatorio::on_tableRelatorio_entered);
-  connect(ui->tableTotalLoja, &TableView::entered, this, &WidgetRelatorio::on_tableTotalLoja_entered);
-  connect(ui->tableTotalVendedor, &TableView::entered, this, &WidgetRelatorio::on_tableTotalVendedor_entered);
-}
+WidgetRelatorio::WidgetRelatorio(QWidget *parent) : QWidget(parent), ui(new Ui::WidgetRelatorio) { ui->setupUi(this); }
 
 WidgetRelatorio::~WidgetRelatorio() { delete ui; }
+
+void WidgetRelatorio::setConnections() {
+  connect(ui->dateEditMes, &QDateEdit::dateChanged, this, &WidgetRelatorio::dateEditMes_dateChanged);
+  connect(ui->pushButtonExcel, &QPushButton::clicked, this, &WidgetRelatorio::on_pushButtonExcel_clicked);
+}
 
 void WidgetRelatorio::setFilterTotaisVendedor() {
   QString filter = "Mês = '" + ui->dateEditMes->date().toString("yyyy-MM") + "'";
@@ -49,7 +37,9 @@ void WidgetRelatorio::setFilterTotaisVendedor() {
 
   modelViewRelatorioVendedor.setFilter(filter);
 
-  if (not modelViewRelatorioVendedor.select()) { emit errorSignal("Erro lendo tabela relatorio_vendedor: " + modelViewRelatorioVendedor.lastError().text()); }
+  qDebug() << "filter2: " << modelViewRelatorioVendedor.filter();
+
+  if (not modelViewRelatorioVendedor.select()) { return; }
 }
 
 void WidgetRelatorio::setFilterTotaisLoja() {
@@ -65,73 +55,48 @@ void WidgetRelatorio::setFilterTotaisLoja() {
 
   modelViewRelatorioLoja.setFilter(filter);
 
-  if (not modelViewRelatorioLoja.select()) { emit errorSignal("Erro lendo tabela relatorio_loja: " + modelViewRelatorioLoja.lastError().text()); }
+  if (not modelViewRelatorioLoja.select()) { return; }
 }
 
-bool WidgetRelatorio::setupTables() {
-  // REFAC: refactor this to not select in here
-
+void WidgetRelatorio::setupTables() {
   modelViewRelatorio.setTable("view_relatorio");
-  modelViewRelatorio.setEditStrategy(QSqlTableModel::OnManualSubmit);
 
   modelViewRelatorio.setHeaderData("idVenda", "Venda");
 
-  modelViewRelatorio.setFilter("0");
-
-  if (not modelViewRelatorio.select()) {
-    emit errorSignal("Erro lendo tabela relatorio: " + modelViewRelatorio.lastError().text());
-    return false;
-  }
-
   ui->tableRelatorio->setModel(&modelViewRelatorio);
+
   ui->tableRelatorio->setItemDelegateForColumn("Faturamento", new ReaisDelegate(this));
-  ui->tableRelatorio->setItemDelegateForColumn("Valor Comissão", new ReaisDelegate(this));
-  ui->tableRelatorio->setItemDelegateForColumn("% Comissão", new PorcentagemDelegate(this));
+  ui->tableRelatorio->setItemDelegateForColumn("Comissão", new ReaisDelegate(this));
+  ui->tableRelatorio->setItemDelegateForColumn("%", new PorcentagemDelegate(this));
+
   ui->tableRelatorio->hideColumn("Mês");
   ui->tableRelatorio->hideColumn("idUsuario");
-  ui->tableRelatorio->resizeColumnsToContents();
 
-  //------------------------------------------------------------------------------
+  // -------------------------------------------------------------------------
 
   modelViewRelatorioVendedor.setTable("view_relatorio_vendedor");
-  modelViewRelatorioVendedor.setEditStrategy(QSqlTableModel::OnManualSubmit);
-
-  modelViewRelatorioVendedor.setFilter("0");
-
-  if (not modelViewRelatorioVendedor.select()) {
-    emit errorSignal("Erro lendo view_relatorio_vendedor: " + modelViewRelatorioVendedor.lastError().text());
-    return false;
-  }
 
   ui->tableTotalVendedor->setModel(&modelViewRelatorioVendedor);
+
   ui->tableTotalVendedor->setItemDelegateForColumn("Faturamento", new ReaisDelegate(this));
-  ui->tableTotalVendedor->setItemDelegateForColumn("Valor Comissão", new ReaisDelegate(this));
-  ui->tableTotalVendedor->setItemDelegateForColumn("% Comissão", new PorcentagemDelegate(this));
+  ui->tableTotalVendedor->setItemDelegateForColumn("Comissão", new ReaisDelegate(this));
+  ui->tableTotalVendedor->setItemDelegateForColumn("%", new PorcentagemDelegate(this));
+
   ui->tableTotalVendedor->hideColumn("idUsuario");
   ui->tableTotalVendedor->hideColumn("Mês");
-  ui->tableTotalVendedor->resizeColumnsToContents();
 
-  //--------------------------------------------------
+  // -------------------------------------------------------------------------
 
   modelViewRelatorioLoja.setTable("view_relatorio_loja");
-  modelViewRelatorioLoja.setEditStrategy(QSqlTableModel::OnManualSubmit);
-
-  modelViewRelatorioLoja.setFilter("0");
-
-  if (not modelViewRelatorioLoja.select()) {
-    emit errorSignal("Erro lendo view_relatorio_vendedor: " + modelViewRelatorioLoja.lastError().text());
-    return false;
-  }
 
   ui->tableTotalLoja->setModel(&modelViewRelatorioLoja);
-  ui->tableTotalLoja->setItemDelegateForColumn("Faturamento", new ReaisDelegate(this));
-  ui->tableTotalLoja->setItemDelegateForColumn("Valor Comissão", new ReaisDelegate(this));
-  ui->tableTotalLoja->setItemDelegateForColumn("% Comissão", new PorcentagemDelegate(this));
-  ui->tableTotalLoja->setItemDelegateForColumn("Reposição", new ReaisDelegate(this));
-  ui->tableTotalLoja->hideColumn("Mês");
-  ui->tableTotalLoja->resizeColumnsToContents();
 
-  return true;
+  ui->tableTotalLoja->setItemDelegateForColumn("Faturamento", new ReaisDelegate(this));
+  ui->tableTotalLoja->setItemDelegateForColumn("Comissão", new ReaisDelegate(this));
+  ui->tableTotalLoja->setItemDelegateForColumn("%", new PorcentagemDelegate(this));
+  ui->tableTotalLoja->setItemDelegateForColumn("Reposição", new ReaisDelegate(this));
+
+  ui->tableTotalLoja->hideColumn("Mês");
 }
 
 void WidgetRelatorio::calcularTotalGeral() {
@@ -141,13 +106,26 @@ void WidgetRelatorio::calcularTotalGeral() {
 
   for (int row = 0; row < modelViewRelatorioLoja.rowCount(); ++row) {
     totalGeral += modelViewRelatorioLoja.data(row, "Faturamento").toDouble();
-    comissao += modelViewRelatorioLoja.data(row, "Valor Comissão").toDouble();
-    porcentagem += modelViewRelatorioLoja.data(row, "% Comissão").toDouble();
+    comissao += modelViewRelatorioLoja.data(row, "Comissão").toDouble();
+    porcentagem += modelViewRelatorioLoja.data(row, "%").toDouble();
   }
 
   ui->doubleSpinBoxGeral->setValue(totalGeral);
   ui->doubleSpinBoxValorComissao->setValue(comissao);
-  ui->doubleSpinBoxPorcentagemComissao->setValue(porcentagem / modelViewRelatorioLoja.rowCount());
+  if (modelViewRelatorioLoja.rowCount() > 0) { ui->doubleSpinBoxPorcentagemComissao->setValue(porcentagem / modelViewRelatorioLoja.rowCount()); }
+}
+
+void WidgetRelatorio::calcularTotalVendedor() {
+  double comissao = 0;
+  double porcentagem = 0;
+
+  for (int row = 0; row < modelViewRelatorioVendedor.rowCount(); ++row) {
+    comissao += modelViewRelatorioVendedor.data(row, "Comissão").toDouble();
+    porcentagem += modelViewRelatorioVendedor.data(row, "%").toDouble();
+  }
+
+  ui->doubleSpinBoxValorComissao->setValue(comissao);
+  if (modelViewRelatorioVendedor.rowCount() > 0) { ui->doubleSpinBoxPorcentagemComissao->setValue(porcentagem / modelViewRelatorioVendedor.rowCount()); }
 }
 
 void WidgetRelatorio::setFilterRelatorio() {
@@ -167,48 +145,72 @@ void WidgetRelatorio::setFilterRelatorio() {
 
   modelViewRelatorio.setFilter(filter);
 
-  if (not modelViewRelatorio.select()) { emit errorSignal("Erro lendo tabela relatorio: " + modelViewRelatorio.lastError().text()); }
+  qDebug() << "filter1: " << modelViewRelatorio.filter();
+
+  if (not modelViewRelatorio.select()) { return; }
 }
 
 void WidgetRelatorio::dateEditMes_dateChanged(const QDate &) { updateTables(); }
 
-void WidgetRelatorio::on_tableRelatorio_entered(const QModelIndex &) { ui->tableRelatorio->resizeColumnsToContents(); }
+void WidgetRelatorio::updateTables() {
+  const auto tipo = UserSession::tipoUsuario();
 
-bool WidgetRelatorio::updateTables() {
-  if (modelViewRelatorio.tableName().isEmpty() and not setupTables()) { return false; }
+  if (not isSet) {
+    if (tipo == "VENDEDOR" or tipo == "VENDEDOR ESPECIAL") {
+      ui->labelTotalLoja->hide();
+      ui->tableTotalLoja->hide();
+      ui->doubleSpinBoxGeral->hide();
+      ui->groupBoxResumoOrcamento->hide();
+    }
 
-  setFilterRelatorio();
-  setFilterTotaisVendedor();
-  setFilterTotaisLoja();
+    ui->dateEditMes->setDate(QDate::currentDate());
+    setConnections();
+    isSet = true;
+  }
 
-  ui->tableRelatorio->resizeColumnsToContents();
-  ui->tableTotalVendedor->resizeColumnsToContents();
-  ui->tableTotalLoja->resizeColumnsToContents();
+  if (not modelIsSet) {
+    setupTables();
+    modelIsSet = true;
+  }
 
-  calcularTotalGeral();
+  if (tipo == "VENDEDOR" or tipo == "VENDEDOR ESPECIAL") {
+    setFilterRelatorio();
+    setFilterTotaisVendedor();
 
+    calcularTotalVendedor();
+  } else {
+    QTime time;
+    time.start();
+    setFilterRelatorio();
+    qDebug() << "1: " << time.restart();
+    setFilterTotaisVendedor();
+    qDebug() << "2: " << time.restart();
+    setFilterTotaisLoja();
+    qDebug() << "3: " << time.restart();
+    calcularTotalGeral();
+    qDebug() << "4: " << time.restart();
+    setResumoOrcamento();
+    qDebug() << "5: " << time.restart();
+  }
+}
+
+void WidgetRelatorio::setResumoOrcamento() {
   QSqlQuery query;
 
-  if (not query.exec("SET @mydate = '" + ui->dateEditMes->date().toString("yyyy-MM") + "'")) {
-    emit errorSignal("Erro comunicando com o banco de dados: " + query.lastError().text());
-    return false;
-  }
+  if (not query.exec("SET @mydate = '" + ui->dateEditMes->date().toString("yyyy-MM") + "'")) { return qApp->enqueueError("Erro comunicando com o banco de dados: " + query.lastError().text(), this); }
 
   modelOrcamento.setTable("view_resumo_relatorio");
-  modelOrcamento.setEditStrategy(QSqlTableModel::OnManualSubmit);
+
+  modelOrcamento.setFilter("");
 
   if (UserSession::tipoUsuario() == "GERENTE LOJA") {
-    const auto descricaoLoja = UserSession::fromLoja("descricao");
-
-    if (descricaoLoja) { modelOrcamento.setFilter("Loja = '" + descricaoLoja.value().toString() + "' ORDER BY Loja, Vendedor"); }
+    if (const auto descricaoLoja = UserSession::fromLoja("descricao"); descricaoLoja) { modelOrcamento.setFilter("Loja = '" + descricaoLoja.value().toString() + "' ORDER BY Loja, Vendedor"); }
   }
 
-  if (not modelOrcamento.select()) {
-    emit errorSignal("Erro lendo view_resumo_relatorio: " + modelOrcamento.lastError().text());
-    return false;
-  }
+  if (not modelOrcamento.select()) { return; }
 
   ui->tableResumoOrcamento->setModel(&modelOrcamento);
+
   ui->tableResumoOrcamento->setItemDelegateForColumn("Validos Anteriores", new ReaisDelegate(this));
   ui->tableResumoOrcamento->setItemDelegateForColumn("Gerados Mes", new ReaisDelegate(this));
   ui->tableResumoOrcamento->setItemDelegateForColumn("Revalidados Mes", new ReaisDelegate(this));
@@ -217,18 +219,9 @@ bool WidgetRelatorio::updateTables() {
   ui->tableResumoOrcamento->setItemDelegateForColumn("Validos Mes", new ReaisDelegate(this));
   ui->tableResumoOrcamento->setItemDelegateForColumn("% Fechados / Gerados", new PorcentagemDelegate(this));
   ui->tableResumoOrcamento->setItemDelegateForColumn("% Fechados / Carteira", new PorcentagemDelegate(this));
-  ui->tableResumoOrcamento->resizeColumnsToContents();
-
-  ui->tableRelatorio->resizeColumnsToContents();
-  ui->tableTotalVendedor->resizeColumnsToContents();
-  ui->tableTotalLoja->resizeColumnsToContents();
-
-  return true;
 }
 
-void WidgetRelatorio::on_tableTotalLoja_entered(const QModelIndex &) { ui->tableTotalLoja->resizeColumnsToContents(); }
-
-void WidgetRelatorio::on_tableTotalVendedor_entered(const QModelIndex &) { ui->tableTotalVendedor->resizeColumnsToContents(); }
+void WidgetRelatorio::resetTables() { modelIsSet = false; }
 
 void WidgetRelatorio::on_pushButtonExcel_clicked() {
   const QString dir = QFileDialog::getExistingDirectory(this, "Pasta para salvar relatório");
@@ -239,23 +232,23 @@ void WidgetRelatorio::on_pushButtonExcel_clicked() {
 
   QFile modelo(QDir::currentPath() + "/" + arquivoModelo);
 
-  if (not modelo.exists()) {
-    emit errorSignal("Não encontrou o modelo do Excel!");
-    return;
-  }
+  if (not modelo.exists()) { return qApp->enqueueError("Não encontrou o modelo do Excel!", this); }
 
   const QString fileName = dir + "/relatorio-" + ui->dateEditMes->date().toString("MM-yyyy") + ".xlsx";
 
   QFile file(fileName);
 
-  if (not file.open(QFile::WriteOnly)) {
-    emit errorSignal("Não foi possível abrir o arquivo para escrita: " + fileName);
-    emit errorSignal("Erro: " + file.errorString());
-    return;
-  }
+  if (not file.open(QFile::WriteOnly)) { return qApp->enqueueError("Não foi possível abrir o arquivo '" + fileName + "' para escrita: " + file.errorString(), this); }
 
   file.close();
 
+  if (not gerarExcel(arquivoModelo, fileName)) { return; }
+
+  QDesktopServices::openUrl(QUrl::fromLocalFile(fileName));
+  qApp->enqueueInformation("Arquivo salvo como " + fileName, this);
+}
+
+bool WidgetRelatorio::gerarExcel(const QString &arquivoModelo, const QString &fileName) {
   QXlsx::Document xlsx(arquivoModelo);
 
   //  xlsx.currentWorksheet()->setFitToPage(true);
@@ -300,11 +293,10 @@ void WidgetRelatorio::on_pushButtonExcel_clicked() {
     column = 'A';
   }
 
-  if (not xlsx.saveAs(fileName)) {
-    emit errorSignal("Ocorreu algum erro ao salvar o arquivo.");
-    return;
-  }
+  if (not xlsx.saveAs(fileName)) { return qApp->enqueueError(false, "Ocorreu algum erro ao salvar o arquivo.", this); }
 
-  QDesktopServices::openUrl(QUrl::fromLocalFile(fileName));
-  emit informationSignal("Arquivo salvo como " + fileName);
+  return true;
 }
+
+// TODO: vendedor especial recebe 0,5% nas vendas como consultor
+// TODO: reimplement views as materialized views? https://www.fromdual.com/mysql-materialized-views

@@ -1,21 +1,13 @@
-#ifndef SQL_H
-#define SQL_H
+#pragma once
 
-#include <QObject>
 #include <QString>
 
-class Sql : public QObject {
-  Q_OBJECT
-
+class Sql {
 public:
-  Sql() = delete; // TODO: make this private so i can use signals
-  static bool updateVendaStatus(const QString &idVenda);
+  Sql() = delete;
+  static auto updateVendaStatus(const QString &idVendas) -> bool;
+  static auto updateVendaStatus(const QStringList &idVendas) -> bool;
 
-signals:
-  void errorSignal(const QString &error);
-  void informationSignal(const QString &information);
-  void transactionEnded();
-  void transactionStarted();
+private:
+  static auto runQuerys(const QString &idVenda) -> bool;
 };
-
-#endif // SQL_H

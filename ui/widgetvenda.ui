@@ -31,6 +31,9 @@
        <property name="enabled">
         <bool>true</bool>
        </property>
+       <property name="placeholderText">
+        <string>Código/Vendedor/Cliente/Profissional</string>
+       </property>
       </widget>
      </item>
      <item row="2" column="0">
@@ -72,12 +75,6 @@
        <property name="sortingEnabled">
         <bool>true</bool>
        </property>
-       <attribute name="horizontalHeaderCascadingSectionResizes">
-        <bool>true</bool>
-       </attribute>
-       <attribute name="horizontalHeaderStretchLastSection">
-        <bool>false</bool>
-       </attribute>
       </widget>
      </item>
      <item row="1" column="0">

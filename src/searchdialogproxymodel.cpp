@@ -1,67 +1,66 @@
-#include <QApplication>
 #include <QBrush>
 #include <QDate>
-#include <QStyle>
+#include <QDebug>
 
 #include "searchdialogproxymodel.h"
+#include "usersession.h"
 
 SearchDialogProxyModel::SearchDialogProxyModel(SqlRelationalTableModel *model, QObject *parent)
-    : QIdentityProxyModel(parent), estoque(model->fieldIndex("estoque")), promocao(model->fieldIndex("promocao")), descontinuado(model->fieldIndex("descontinuado")),
-      validade(model->fieldIndex("validadeProdutos")) {
-  setSourceModel(model);
-}
+    : SortFilterProxyModel(model, parent), estoqueColumn(model->fieldIndex("estoque", true)), promocaoColumn(model->fieldIndex("promocao", true)),
+      descontinuadoColumn(model->fieldIndex("descontinuado", true)), validadeColumn(model->fieldIndex("validadeProdutos", true)) {}
 
 QVariant SearchDialogProxyModel::data(const QModelIndex &proxyIndex, int role) const {
-  if (role == Qt::BackgroundRole) {
-    const bool descontinuado = QIdentityProxyModel::data(index(proxyIndex.row(), this->descontinuado), Qt::DisplayRole).toBool();
+  if (descontinuadoColumn != -1) {
+    const bool descontinuado = SortFilterProxyModel::data(proxyIndex.row(), descontinuadoColumn, Qt::DisplayRole).toBool();
 
-    if (descontinuado == true) return QBrush(Qt::red); // descontinuado
+    if (descontinuado) {
+      if (role == Qt::BackgroundRole) { return QBrush(Qt::red); }
+      if (role == Qt::ForegroundRole) { return QBrush(Qt::black); }
+    }
+  }
 
-    //    const bool estoque = QIdentityProxyModel::data(index(proxyIndex.row(), this->estoque), Qt::DisplayRole).toBool();
-    const int estoque = QIdentityProxyModel::data(index(proxyIndex.row(), this->estoque), Qt::DisplayRole).toInt();
-    const bool promocao = QIdentityProxyModel::data(index(proxyIndex.row(), this->promocao), Qt::DisplayRole).toBool();
+  if (estoqueColumn != -1) {
+    const bool estoque = SortFilterProxyModel::data(proxyIndex.row(), estoqueColumn, Qt::DisplayRole).toBool();
 
-    //    if (estoque == true) return QBrush(Qt::blue);   // estoque
-    if (estoque == 1) return QBrush(Qt::yellow);
-    if (estoque == 2) return QBrush(Qt::blue);
-    if (promocao == true) return QBrush(Qt::green); // promocao
+    if (estoque) {
+      if (role == Qt::BackgroundRole) { return QBrush(Qt::yellow); }
+      if (role == Qt::ForegroundRole) { return QBrush(Qt::black); }
+    }
+  }
 
-    if (proxyIndex.column() == this->validade) {
-      const QDate validade = QIdentityProxyModel::data(index(proxyIndex.row(), this->validade), Qt::DisplayRole).toDate();
+  if (promocaoColumn != -1) {
+    const int promocao = SortFilterProxyModel::data(proxyIndex.row(), promocaoColumn, Qt::DisplayRole).toInt();
 
-      if (validade < QDate::currentDate()) return QBrush(Qt::red);
+    if (promocao == 1) {
+      if (role == Qt::BackgroundRole) { return QBrush(Qt::green); } // promocao
+      if (role == Qt::ForegroundRole) { return QBrush(Qt::black); }
+    }
+
+    if (promocao == 2) {
+      if (role == Qt::BackgroundRole) { return QBrush(Qt::blue); } // staccato OFF
+      if (role == Qt::ForegroundRole) { return QBrush(Qt::white); }
+    }
+  }
+
+  if (proxyIndex.column() == validadeColumn) {
+    const QDate validade = SortFilterProxyModel::data(proxyIndex.row(), validadeColumn, Qt::DisplayRole).toDate();
+    const bool expirado = validade < QDate::currentDate();
+
+    if (expirado) {
+      if (role == Qt::BackgroundRole) { return QBrush(Qt::red); }
+      if (role == Qt::ForegroundRole) { return QBrush(Qt::black); }
     }
   }
 
   if (role == Qt::ForegroundRole) {
+    const auto tema = UserSession::getSetting("User/tema");
 
-    // those paint the text as black if the background is colored
+    if (not tema) { return QBrush(Qt::black); }
 
-    const bool descontinuado = QIdentityProxyModel::data(index(proxyIndex.row(), this->descontinuado), Qt::DisplayRole).toBool();
-
-    if (descontinuado == true) return QBrush(Qt::black);
-
-    //    const bool estoque = QIdentityProxyModel::data(index(proxyIndex.row(), this->estoque), Qt::DisplayRole).toBool();
-    const int estoque = QIdentityProxyModel::data(index(proxyIndex.row(), this->estoque), Qt::DisplayRole).toInt();
-    const bool promocao = QIdentityProxyModel::data(index(proxyIndex.row(), this->promocao), Qt::DisplayRole).toBool();
-
-    //    if (estoque == true) return QBrush(Qt::white);
-    if (estoque == 1) return QBrush(Qt::black);
-    if (estoque == 2) return QBrush(Qt::white);
-    if (promocao == true) return QBrush(Qt::black);
-
-    if (proxyIndex.column() == this->validade) {
-      const QDate validade = QIdentityProxyModel::data(index(proxyIndex.row(), this->validade), Qt::DisplayRole).toDate();
-
-      if (validade < QDate::currentDate()) return QBrush(Qt::black);
-    }
-
-    //
-
-    return qApp->style()->objectName() == "fusion" ? QBrush(Qt::black) : QBrush(Qt::white);
+    return tema->toString() == "claro" ? QBrush(Qt::black) : QBrush(Qt::white);
   }
 
-  return QIdentityProxyModel::data(proxyIndex, role);
+  return QSortFilterProxyModel::data(proxyIndex, role);
 }
 
 // TODO: posteriormente remover o azul da promocao 'staccato off'

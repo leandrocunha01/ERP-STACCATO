@@ -4,11 +4,13 @@
 #include <QSqlError>
 #include <QSqlQuery>
 
+#include "application.h"
 #include "inputdialogconfirmacao.h"
 #include "orcamento.h"
+#include "sortfilterproxymodel.h"
 #include "ui_inputdialogconfirmacao.h"
 
-InputDialogConfirmacao::InputDialogConfirmacao(const Tipo tipo, QWidget *parent) : Dialog(parent), tipo(tipo), ui(new Ui::InputDialogConfirmacao) {
+InputDialogConfirmacao::InputDialogConfirmacao(const Tipo tipo, QWidget *parent) : QDialog(parent), tipo(tipo), ui(new Ui::InputDialogConfirmacao) {
   ui->setupUi(this);
 
   connect(ui->dateEditEvento, &QDateTimeEdit::dateChanged, this, &InputDialogConfirmacao::on_dateEditEvento_dateChanged);
@@ -71,48 +73,27 @@ QString InputDialogConfirmacao::getEntregou() const { return ui->lineEditEntrego
 
 bool InputDialogConfirmacao::cadastrar() {
   if (tipo == Tipo::Recebimento) {
-    if (not modelEstoque.submitAll()) {
-      emit errorSignal("Erro salvando dados na tabela: " + modelEstoque.lastError().text());
-      return false;
-    }
+    if (not modelEstoque.submitAll()) { return false; }
   }
 
   if (tipo == Tipo::Entrega) {
-    if (not modelVeiculo.submitAll()) {
-      emit errorSignal("Erro salvando dados na tabela: " + modelVeiculo.lastError().text());
-      return false;
-    }
+    if (not modelVeiculo.submitAll()) { return false; }
   }
 
   return true;
 }
 
 void InputDialogConfirmacao::on_pushButtonSalvar_clicked() {
-  if ((tipo == Tipo::Recebimento or tipo == Tipo::Entrega) and ui->lineEditRecebeu->text().isEmpty()) {
-    QMessageBox::critical(this, "Erro!", "Faltou preencher quem recebeu!");
-    return;
-  }
+  if ((tipo == Tipo::Recebimento or tipo == Tipo::Entrega) and ui->lineEditRecebeu->text().isEmpty()) { return qApp->enqueueError("Faltou preencher quem recebeu!", this); }
 
-  if (tipo == Tipo::Entrega and ui->lineEditEntregou->text().isEmpty()) {
-    QMessageBox::critical(this, "Erro!", "Faltou preencher quem entregou!");
-    return;
-  }
+  if (tipo == Tipo::Entrega and ui->lineEditEntregou->text().isEmpty()) { return qApp->enqueueError("Faltou preencher quem entregou!", this); }
 
   if (tipo != Tipo::Representacao) {
-    emit transactionStarted();
+    if (not qApp->startTransaction()) { return; }
 
-    if (not QSqlQuery("SET SESSION TRANSACTION ISOLATION LEVEL SERIALIZABLE").exec()) return;
-    if (not QSqlQuery("START TRANSACTION").exec()) return;
+    if (not cadastrar()) { return qApp->rollbackTransaction(); }
 
-    if (not cadastrar()) {
-      QSqlQuery("ROLLBACK").exec();
-      emit transactionEnded();
-      return;
-    }
-
-    if (not QSqlQuery("COMMIT").exec()) return;
-
-    emit transactionEnded();
+    if (not qApp->endTransaction()) { return; }
   }
 
   QDialog::accept();
@@ -120,17 +101,18 @@ void InputDialogConfirmacao::on_pushButtonSalvar_clicked() {
 }
 
 void InputDialogConfirmacao::on_dateEditEvento_dateChanged(const QDate &date) {
-  if (ui->dateEditProximo->date() < date) ui->dateEditProximo->setDate(date);
+  if (ui->dateEditProximo->date() < date) { ui->dateEditProximo->setDate(date); }
 }
 
 void InputDialogConfirmacao::setupTables() {
   if (tipo == Tipo::Recebimento) {
     modelEstoque.setTable("estoque");
-    modelEstoque.setEditStrategy(QSqlTableModel::OnManualSubmit);
+
     modelEstoque.setHeaderData("status", "Status");
     modelEstoque.setHeaderData("local", "Local");
     modelEstoque.setHeaderData("fornecedor", "Fornecedor");
     modelEstoque.setHeaderData("descricao", "Produto");
+    modelEstoque.setHeaderData("observacao", "Obs.");
     modelEstoque.setHeaderData("quant", "Quant.");
     modelEstoque.setHeaderData("un", "Un.");
     modelEstoque.setHeaderData("caixas", "Cx.");
@@ -138,15 +120,12 @@ void InputDialogConfirmacao::setupTables() {
     modelEstoque.setHeaderData("lote", "Lote");
     modelEstoque.setHeaderData("bloco", "Bloco");
 
-    modelEstoque.setFilter("0");
-
-    if (not modelEstoque.select()) {
-      emit errorSignal("Erro lendo tabela estoque: " + modelEstoque.lastError().text());
-      return;
-    }
+    modelEstoque.proxyModel = new SortFilterProxyModel(&modelEstoque, this);
 
     ui->tableLogistica->setModel(&modelEstoque);
+
     ui->tableLogistica->hideColumn("idEstoque");
+    ui->tableLogistica->hideColumn("idNFe");
     ui->tableLogistica->hideColumn("recebidoPor");
     ui->tableLogistica->hideColumn("idProduto");
     ui->tableLogistica->hideColumn("quantUpd");
@@ -189,7 +168,7 @@ void InputDialogConfirmacao::setupTables() {
 
   if (tipo == Tipo::Entrega) {
     modelVeiculo.setTable("veiculo_has_produto");
-    modelVeiculo.setEditStrategy(QSqlTableModel::OnManualSubmit);
+
     modelVeiculo.setHeaderData("idVenda", "Venda");
     modelVeiculo.setHeaderData("status", "Status");
     modelVeiculo.setHeaderData("fornecedor", "Fornecedor");
@@ -203,14 +182,10 @@ void InputDialogConfirmacao::setupTables() {
     modelVeiculo.setHeaderData("codComercial", "Cód. Com.");
     modelVeiculo.setHeaderData("formComercial", "Form. Com.");
 
-    modelVeiculo.setFilter("0");
-
-    if (not modelVeiculo.select()) {
-      emit errorSignal("Erro lendo tabela veiculo: " + modelVeiculo.lastError().text());
-      return;
-    }
+    modelVeiculo.proxyModel = new SortFilterProxyModel(&modelVeiculo, this);
 
     ui->tableLogistica->setModel(&modelVeiculo);
+
     ui->tableLogistica->hideColumn("id");
     ui->tableLogistica->hideColumn("data");
     ui->tableLogistica->hideColumn("idEvento");
@@ -225,22 +200,13 @@ void InputDialogConfirmacao::setupTables() {
 }
 
 bool InputDialogConfirmacao::setFilterEntrega(const QString &id, const QString &idEvento) { // entrega
-  if (id.isEmpty()) {
-    modelVeiculo.setFilter("0");
-    QMessageBox::critical(this, "Erro!", "IdsCompra vazio!");
-    return false;
-  }
+  if (id.isEmpty()) { return qApp->enqueueError(false, "IdsCompra vazio!", this); }
 
   const QString filter = "idVenda = '" + id + "' AND idEvento = " + idEvento;
 
   modelVeiculo.setFilter(filter);
 
-  if (not modelVeiculo.select()) {
-    QMessageBox::critical(this, "Erro!", "Erro lendo tabela pedido_fornecedor_has_produto: " + modelVeiculo.lastError().text());
-    return false;
-  }
-
-  ui->tableLogistica->resizeColumnsToContents();
+  if (not modelVeiculo.select()) { return false; }
 
   ui->dateEditEvento->setDateTime(modelVeiculo.data(0, "data").toDateTime());
 
@@ -248,22 +214,13 @@ bool InputDialogConfirmacao::setFilterEntrega(const QString &id, const QString &
 }
 
 bool InputDialogConfirmacao::setFilterRecebe(const QStringList &ids) { // recebimento
-  if (ids.isEmpty()) {
-    modelEstoque.setFilter("0");
-    QMessageBox::critical(this, "Erro!", "IdsCompra vazio!");
-    return false;
-  }
+  if (ids.isEmpty()) { return qApp->enqueueError(false, "IdsCompra vazio!", this); }
 
   const QString filter = "idEstoque = " + ids.join(" OR idEstoque = ");
 
   modelEstoque.setFilter(filter);
 
-  if (not modelEstoque.select()) {
-    QMessageBox::critical(this, "Erro!", "Erro lendo tabela pedido_fornecedor_has_produto: " + modelEstoque.lastError().text());
-    return false;
-  }
-
-  ui->tableLogistica->resizeColumnsToContents();
+  if (not modelEstoque.select()) { return false; }
 
   setWindowTitle("Estoque: " + ids.join(", "));
 
@@ -280,14 +237,11 @@ void InputDialogConfirmacao::on_pushButtonQuebrado_clicked() {
 
   const auto list = ui->tableLogistica->selectionModel()->selectedRows();
 
-  if (list.isEmpty()) {
-    QMessageBox::critical(this, "Erro!", "Nenhum item selecionado!");
-    return;
-  }
+  if (list.isEmpty()) { return qApp->enqueueError("Nenhum item selecionado!", this); }
 
   const int row = list.first().row();
 
-  //
+  // -------------------------------------------------------------------------
 
   QString produto;
   double unCaixa = 0;
@@ -301,10 +255,7 @@ void InputDialogConfirmacao::on_pushButtonQuebrado_clicked() {
     query.prepare("SELECT UPPER(un) AS un, m2cx, pccx FROM produto WHERE idProduto = :idProduto");
     query.bindValue(":idProduto", modelEstoque.data(row, "idProduto"));
 
-    if (not query.exec() or not query.first()) {
-      emit errorSignal("Erro buscando dados do produto: " + query.lastError().text());
-      return;
-    }
+    if (not query.exec() or not query.first()) { return qApp->enqueueError("Erro buscando dados do produto: " + query.lastError().text(), this); }
 
     const QString un = query.value("un").toString();
     const double m2cx = query.value("m2cx").toDouble();
@@ -329,27 +280,18 @@ void InputDialogConfirmacao::on_pushButtonQuebrado_clicked() {
   }
 
   bool ok;
+  // TODO: verify if this needs to be changed to use step after &ok
   const double caixasDefeito = QInputDialog::getDouble(this, produto, "Caixas quebradas: ", caixas, 0, caixas, 1, &ok);
 
-  if (not ok or qFuzzyIsNull(caixasDefeito)) return;
-  //
+  if (not ok or qFuzzyIsNull(caixasDefeito)) { return; }
 
-  emit transactionStarted();
+  if (not qApp->startTransaction()) { return; }
 
-  if (not QSqlQuery("SET SESSION TRANSACTION ISOLATION LEVEL SERIALIZABLE").exec()) return;
-  if (not QSqlQuery("START TRANSACTION").exec()) return;
+  if (not processarQuebra(row, choice, caixasDefeito, unCaixa)) { return qApp->rollbackTransaction(); }
 
-  if (not processarQuebra(row, choice, caixasDefeito, unCaixa)) {
-    QSqlQuery("ROLLBACK").exec();
-    emit transactionEnded();
-    return;
-  }
+  if (not qApp->endTransaction()) { return; }
 
-  if (not QSqlQuery("COMMIT").exec()) return;
-
-  emit transactionEnded();
-
-  emit informationSignal("Operação realizada com sucesso!");
+  qApp->enqueueInformation("Operação realizada com sucesso!", this);
 }
 
 bool InputDialogConfirmacao::processarQuebra(const int row, const int choice, const double caixasDefeito, const double unCaixa) {
@@ -375,10 +317,7 @@ bool InputDialogConfirmacao::quebrarRecebimento(const int row, const double caix
   //  query.prepare("SELECT UPPER(un) AS un, m2cx, pccx FROM produto WHERE idProduto = :idProduto");
   //  query.bindValue(":idProduto", model.data(row, "idProduto"));
 
-  //  if (not query.exec() or not query.first()) {
-  //    emit errorSignal("Erro buscando dados do produto: " + query.lastError().text());
-  //    return false;
-  //  }
+  //  if (not query.exec() or not query.first()) { return qApp->enqueueError(false, "Erro buscando dados do produto: " + query.lastError().text()); }
 
   //  const QString un = query.value("un").toString();
   //  const double m2cx = query.value("m2cx").toDouble();
@@ -445,15 +384,16 @@ bool InputDialogConfirmacao::quebrarEntrega(const int row, const int choice, con
 
   // copiar linha com quantDefeito
 
-  const int rowQuebrado = modelVeiculo.rowCount();
-  modelVeiculo.insertRow(rowQuebrado);
+  const int rowQuebrado = modelVeiculo.insertRowAtEnd();
 
   for (int col = 0; col < modelVeiculo.columnCount(); ++col) {
     if (modelVeiculo.fieldIndex("id") == col) { continue; }
     if (modelVeiculo.fieldIndex("created") == col) { continue; }
     if (modelVeiculo.fieldIndex("lastUpdated") == col) { continue; }
 
-    if (not modelVeiculo.setData(rowQuebrado, col, modelVeiculo.data(row, col))) { return false; }
+    const QVariant value = modelVeiculo.data(row, col);
+
+    if (not modelVeiculo.setData(rowQuebrado, col, value)) { return false; }
   }
 
   // recalcular kg? (posso usar proporcao para nao precisar puxar kgcx)
@@ -465,23 +405,31 @@ bool InputDialogConfirmacao::quebrarEntrega(const int row, const int choice, con
 
   if (choice == QMessageBox::Cancel) { return false; }
 
+  // TODO: marcar idRelacionado
+
   SqlRelationalTableModel modelVendaProduto;
   modelVendaProduto.setTable("venda_has_produto");
-  modelVendaProduto.setEditStrategy(QSqlTableModel::OnManualSubmit);
 
   modelVendaProduto.setFilter("idVendaProduto = " + modelVeiculo.data(row, "idVendaProduto").toString());
 
-  if (not modelVendaProduto.select()) {
-    emit errorSignal("Erro lendo tabela produto venda: " + modelVendaProduto.lastError().text());
-    return false;
-  }
+  if (not modelVendaProduto.select()) { return false; }
 
-  if (not modelVendaProduto.setData(0, "caixas", caixas - caixasDefeito)) { return false; }
-  if (not modelVendaProduto.setData(0, "quant", (caixas - caixasDefeito) * unCaixa)) { return false; }
+  const double caixasRestante = caixas - caixasDefeito;
+  const double quantRestante = caixasRestante * unCaixa;
 
-  const int rowQuebrado2 = modelVendaProduto.rowCount();
-  // NOTE: *quebralinha venda_produto/pedido_fornecedor
-  modelVendaProduto.insertRow(rowQuebrado2);
+  if (not modelVendaProduto.setData(0, "caixas", caixasRestante)) { return false; }
+  if (not modelVendaProduto.setData(0, "quant", quantRestante)) { return false; }
+
+  const double prcUnitario = modelVendaProduto.data(0, "prcUnitario").toDouble();
+  const double descUnitario = modelVendaProduto.data(0, "descUnitario").toDouble();
+  const double descGlobal = modelVendaProduto.data(0, "descGlobal").toDouble() / 100;
+
+  if (not modelVendaProduto.setData(0, "parcial", quantRestante * prcUnitario)) { return false; }
+  if (not modelVendaProduto.setData(0, "parcialDesc", quantRestante * descUnitario)) { return false; }
+  if (not modelVendaProduto.setData(0, "total", quantRestante * descUnitario * (1 - descGlobal))) { return false; }
+
+  const int rowQuebrado2 = modelVendaProduto.insertRowAtEnd();
+  // NOTE: *quebralinha venda_produto
 
   for (int col = 0; col < modelVendaProduto.columnCount(); ++col) {
     if (modelVendaProduto.fieldIndex("idVendaProduto") == col) { continue; }
@@ -502,23 +450,26 @@ bool InputDialogConfirmacao::quebrarEntrega(const int row, const int choice, con
     if (modelVendaProduto.fieldIndex("created") == col) { continue; }
     if (modelVendaProduto.fieldIndex("lastUpdated") == col) { continue; }
 
-    if (not modelVendaProduto.setData(rowQuebrado2, col, modelVendaProduto.data(0, col))) { return false; }
+    const QVariant value = modelVendaProduto.data(0, col);
+
+    if (not modelVendaProduto.setData(rowQuebrado2, col, value)) { return false; }
   }
 
+  const double quantDefeito = caixasDefeito * unCaixa;
+
   if (not modelVendaProduto.setData(rowQuebrado2, "caixas", caixasDefeito)) { return false; }
-  if (not modelVendaProduto.setData(rowQuebrado2, "quant", caixasDefeito * unCaixa)) { return false; }
+  if (not modelVendaProduto.setData(rowQuebrado2, "quant", quantDefeito)) { return false; }
   if (not modelVendaProduto.setData(rowQuebrado2, "status", "QUEBRADO")) { return false; }
 
-  //
+  if (not modelVendaProduto.setData(rowQuebrado2, "parcial", quantDefeito * prcUnitario)) { return false; }
+  if (not modelVendaProduto.setData(rowQuebrado2, "parcialDesc", quantDefeito * descUnitario)) { return false; }
+  if (not modelVendaProduto.setData(rowQuebrado2, "total", quantDefeito * descUnitario * (1 - descGlobal))) { return false; }
+
+  // -------------------------------------------------------------------------
 
   choice == QMessageBox::Yes ? criarReposicaoCliente(modelVendaProduto, caixasDefeito, unCaixa) : gerarCreditoCliente(modelVendaProduto, caixasDefeito, unCaixa);
 
-  if (not modelVendaProduto.submitAll()) {
-    emit errorSignal("Erro salvando produto venda: " + modelVendaProduto.lastError().text());
-    return false;
-  }
-
-  return true;
+  return modelVendaProduto.submitAll();
 }
 
 bool InputDialogConfirmacao::gerarCreditoCliente(const SqlRelationalTableModel &modelVendaProduto, const double caixasDefeito, const double unCaixa) {
@@ -527,44 +478,33 @@ bool InputDialogConfirmacao::gerarCreditoCliente(const SqlRelationalTableModel &
 
   const double credito = caixasDefeito * unCaixa * descUnitario;
 
-  emit informationSignal("Gerado crédito no valor de R$ " + QLocale(QLocale::Portuguese).toString(credito));
+  qApp->enqueueInformation("Gerado crédito no valor de R$ " + QLocale(QLocale::Portuguese).toString(credito), this);
 
   SqlRelationalTableModel modelCliente;
   modelCliente.setTable("cliente");
-  modelCliente.setEditStrategy(QSqlTableModel::OnManualSubmit);
 
   QSqlQuery query;
   query.prepare("SELECT idCliente FROM venda WHERE idVenda = :idVenda");
   query.bindValue(":idVenda", idVenda);
 
-  if (not query.exec() or not query.first()) {
-    emit errorSignal("Erro buscando cliente: " + query.lastError().text());
-    return false;
-  }
+  if (not query.exec() or not query.first()) { return qApp->enqueueError(false, "Erro buscando cliente: " + query.lastError().text(), this); }
 
   modelCliente.setFilter("idCliente = " + query.value("idCliente").toString());
 
-  if (not modelCliente.select()) {
-    emit errorSignal("Erro lendo tabela cliente: " + modelCliente.lastError().text());
-    return false;
-  }
+  if (not modelCliente.select()) { return false; }
 
   const double creditoAntigo = modelCliente.data(0, "credito").toDouble();
 
   if (not modelCliente.setData(0, "credito", credito + creditoAntigo)) { return false; }
 
-  if (not modelCliente.submitAll()) {
-    emit errorSignal("Erro salvando crédito: " + modelCliente.lastError().text());
-    return false;
-  }
+  if (not modelCliente.submitAll()) { return false; }
 
   return true;
 }
 
 bool InputDialogConfirmacao::criarReposicaoCliente(SqlRelationalTableModel &modelVendaProduto, const double caixasDefeito, const double unCaixa) {
-  const int newRow = modelVendaProduto.rowCount();
-  // NOTE: *quebralinha venda_produto/pedido_fornecedor
-  modelVendaProduto.insertRow(newRow);
+  const int newRow = modelVendaProduto.insertRowAtEnd();
+  // NOTE: *quebralinha venda_produto
 
   // copiar linha com quantidade quebrada
   for (int col = 0; col < modelVendaProduto.columnCount(); ++col) {
@@ -586,7 +526,9 @@ bool InputDialogConfirmacao::criarReposicaoCliente(SqlRelationalTableModel &mode
     if (modelVendaProduto.fieldIndex("created") == col) { continue; }
     if (modelVendaProduto.fieldIndex("lastUpdated") == col) { continue; }
 
-    if (not modelVendaProduto.setData(newRow, col, modelVendaProduto.data(0, col))) { return false; }
+    const QVariant value = modelVendaProduto.data(0, col);
+
+    if (not modelVendaProduto.setData(newRow, col, value)) { return false; }
   }
 
   if (not modelVendaProduto.setData(newRow, "quant", caixasDefeito * unCaixa)) { return false; }
@@ -597,13 +539,12 @@ bool InputDialogConfirmacao::criarReposicaoCliente(SqlRelationalTableModel &mode
   if (not modelVendaProduto.setData(newRow, "descGlobal", 0)) { return false; }
   if (not modelVendaProduto.setData(newRow, "total", 0)) { return false; }
   if (not modelVendaProduto.setData(newRow, "status", "REPO. ENTREGA")) { return false; }
-  if (not modelVendaProduto.setData(newRow, "reposicao", true)) { return false; }
+  if (not modelVendaProduto.setData(newRow, "reposicaoEntrega", true)) { return false; }
 
   // REFAC: this blocks the transaction
   const QString obs = QInputDialog::getText(this, "Observacao", "Observacao: ");
-  if (not modelVendaProduto.setData(newRow, "obs", "(REPO. ENTREGA) " + obs)) { return false; }
 
-  return true;
+  return modelVendaProduto.setData(newRow, "obs", "(REPO. ENTREGA) " + obs);
 }
 
 bool InputDialogConfirmacao::quebrarLinhaRecebimento(const int row, const int caixas, const double caixasDefeito, const double unCaixa) {
@@ -615,15 +556,16 @@ bool InputDialogConfirmacao::quebrarLinhaRecebimento(const int row, const int ca
 
   // copiar linha com defeito
 
-  const int rowQuebrado = modelEstoque.rowCount();
-  modelEstoque.insertRow(rowQuebrado);
+  const int rowQuebrado = modelEstoque.insertRowAtEnd();
 
   for (int col = 0; col < modelEstoque.columnCount(); ++col) {
     if (modelEstoque.fieldIndex("idEstoque") == col) { continue; }
     if (modelEstoque.fieldIndex("created") == col) { continue; }
     if (modelEstoque.fieldIndex("lastUpdated") == col) { continue; }
 
-    if (not modelEstoque.setData(rowQuebrado, col, modelEstoque.data(row, col))) { return false; }
+    const QVariant value = modelEstoque.data(row, col);
+
+    if (not modelEstoque.setData(rowQuebrado, col, value)) { return false; }
   }
 
   const QString obs = "Estoque: " + modelEstoque.data(row, "idEstoque").toString() + " - " + QInputDialog::getText(this, "Observacao", "Observacao: ");
@@ -635,10 +577,7 @@ bool InputDialogConfirmacao::quebrarLinhaRecebimento(const int row, const int ca
   if (not modelEstoque.setData(rowQuebrado, "status", "QUEBRADO")) { return false; }
   // TODO: recalcular proporcional dos valores
 
-  if (not modelEstoque.submitAll()) {
-    emit errorSignal("Erro dividindo linhas: " + modelEstoque.lastError().text());
-    return false;
-  }
+  if (not modelEstoque.submitAll()) { return false; }
 
   return true;
 }
@@ -651,10 +590,7 @@ bool InputDialogConfirmacao::desfazerConsumo(const int idEstoque, const double c
   query.prepare("SELECT COALESCE(e.caixas - SUM(ehc.caixas), 0) AS sobra FROM estoque_has_consumo ehc LEFT JOIN estoque e ON ehc.idEstoque = e.idEstoque WHERE ehc.idEstoque = :idEstoque");
   query.bindValue(":idEstoque", idEstoque);
 
-  if (not query.exec() or not query.first()) {
-    emit errorSignal("Erro buscando sobra estoque: " + query.lastError().text());
-    return false;
-  }
+  if (not query.exec() or not query.first()) { return qApp->enqueueError(false, "Erro buscando sobra estoque: " + query.lastError().text(), this); }
 
   // REFAC: why this int is stored in a double?
   double sobra = query.value("sobra").toInt();
@@ -664,42 +600,35 @@ bool InputDialogConfirmacao::desfazerConsumo(const int idEstoque, const double c
   if (sobra < 0) {
     // faltando pecas para consumo, desfazer os consumos com prazo maior
 
-    QSqlQuery query2;
-    query2.prepare("SELECT CAST((`v`.`data` + INTERVAL `v`.`prazoEntrega` DAY) AS DATE) AS `prazoEntrega`, ehc.* FROM estoque_has_consumo ehc LEFT JOIN venda_has_produto vp ON ehc.idVendaProduto = "
-                   "vp.idVendaProduto LEFT JOIN venda v ON vp.idVenda = v.idVenda WHERE ehc.idEstoque = :idEstoque ORDER BY prazoEntrega DESC");
-    query2.bindValue(":idEstoque", idEstoque);
+    QSqlQuery querySelect;
+    querySelect.prepare(
+        "SELECT CAST((`v`.`data` + INTERVAL `v`.`prazoEntrega` DAY) AS DATE) AS `prazoEntrega`, ehc.* FROM estoque_has_consumo ehc LEFT JOIN venda_has_produto vp ON ehc.idVendaProduto = "
+        "vp.idVendaProduto LEFT JOIN venda v ON vp.idVenda = v.idVenda WHERE ehc.idEstoque = :idEstoque ORDER BY prazoEntrega DESC");
+    querySelect.bindValue(":idEstoque", idEstoque);
 
-    if (not query2.exec()) {
-      emit errorSignal("Erro buscando consumo estoque: " + query2.lastError().text());
-      return false;
-    }
+    if (not querySelect.exec()) { return qApp->enqueueError(false, "Erro buscando consumo estoque: " + querySelect.lastError().text(), this); }
 
-    QSqlQuery query3;
+    QSqlQuery queryDelete;
     // TODO: 0se a parte não quebrada for suficiente nao desfazer consumos (tomar cuidado para usar o idEstoque do restante e nao do quebrado)
-    query3.prepare("DELETE FROM estoque_has_consumo WHERE idConsumo = :idConsumo");
+    queryDelete.prepare("DELETE FROM estoque_has_consumo WHERE idConsumo = :idConsumo");
 
-    QSqlQuery query4;
-    query4.prepare("UPDATE venda_has_produto SET status = 'REPO. RECEB.', dataPrevEnt = NULL WHERE idVendaProduto = :idVendaProduto");
+    QSqlQuery queryVenda;
+    // TODO: should set flag 'reposicao'
+    queryVenda.prepare("UPDATE venda_has_produto SET status = 'REPO. RECEB.', dataPrevEnt = NULL WHERE idVendaProduto = :idVendaProduto AND status NOT IN ('CANCELADO', 'DEVOLVIDO')");
 
-    while (query2.next()) {
-      const int caixas = query2.value("caixas").toInt();
+    while (querySelect.next()) {
+      const int caixas = querySelect.value("caixas").toInt();
 
-      query3.bindValue(":idConsumo", query2.value("idConsumo"));
+      queryDelete.bindValue(":idConsumo", querySelect.value("idConsumo"));
 
-      if (not query3.exec()) {
-        emit errorSignal("Erro removendo consumo: " + query3.lastError().text());
-        return false;
-      }
+      if (not queryDelete.exec()) { return qApp->enqueueError(false, "Erro removendo consumo: " + queryDelete.lastError().text(), this); }
 
-      query4.bindValue(":idVendaProduto", query2.value("idVendaProduto"));
+      queryVenda.bindValue(":idVendaProduto", querySelect.value("idVendaProduto"));
 
-      if (not query4.exec()) {
-        emit errorSignal("Erro voltando produto para pendente: " + query4.lastError().text());
-        return false;
-      }
+      if (not queryVenda.exec()) { return qApp->enqueueError(false, "Erro voltando produto para pendente: " + queryVenda.lastError().text(), this); }
 
       sobra += caixas;
-      if (sobra >= 0) break;
+      if (sobra >= 0) { break; }
     }
   }
 

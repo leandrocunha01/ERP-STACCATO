@@ -4,65 +4,80 @@
 #include <QSqlError>
 #include <QSqlQuery>
 
+#include "application.h"
+#include "collapsiblewidget.h"
 #include "ui_widgetlogisticacalendario.h"
 #include "widgetlogisticacalendario.h"
 
-WidgetLogisticaCalendario::WidgetLogisticaCalendario(QWidget *parent) : Widget(parent), ui(new Ui::WidgetLogisticaCalendario) {
-  ui->setupUi(this);
+WidgetLogisticaCalendario::WidgetLogisticaCalendario(QWidget *parent) : QWidget(parent), ui(new Ui::WidgetLogisticaCalendario) { ui->setupUi(this); }
 
+WidgetLogisticaCalendario::~WidgetLogisticaCalendario() { delete ui; }
+
+void WidgetLogisticaCalendario::setConnections() {
   connect(ui->calendarWidget, &QCalendarWidget::selectionChanged, this, &WidgetLogisticaCalendario::on_calendarWidget_selectionChanged);
   connect(ui->checkBoxMostrarFiltros, &QCheckBox::toggled, this, &WidgetLogisticaCalendario::on_checkBoxMostrarFiltros_toggled);
   connect(ui->pushButtonAnterior, &QPushButton::clicked, this, &WidgetLogisticaCalendario::on_pushButtonAnterior_clicked);
   connect(ui->pushButtonProximo, &QPushButton::clicked, this, &WidgetLogisticaCalendario::on_pushButtonProximo_clicked);
 }
 
-WidgetLogisticaCalendario::~WidgetLogisticaCalendario() { delete ui; }
+void WidgetLogisticaCalendario::listarVeiculos() {
+  QSqlQuery query;
 
-bool WidgetLogisticaCalendario::updateTables() {
-  if (not setup) {
-    QSqlQuery query;
-
-    if (not query.exec("SELECT t.razaoSocial, tv.modelo FROM transportadora t LEFT JOIN transportadora_has_veiculo tv ON t.idTransportadora = tv.idTransportadora ORDER BY razaoSocial, modelo")) {
-      emit errorSignal("Erro buscando veiculos: " + query.lastError().text());
-      return false;
-    }
-
-    while (query.next()) {
-      auto *checkbox = new QCheckBox(this);
-      checkbox->setText(query.value("razaoSocial").toString() + " / " + query.value("modelo").toString());
-      checkbox->setChecked(true);
-      connect(checkbox, &QAbstractButton::toggled, this, &WidgetLogisticaCalendario::updateFilter);
-      ui->groupBoxVeiculos->layout()->addWidget(checkbox);
-    }
-
-    ui->groupBoxVeiculos->layout()->addItem(new QSpacerItem(20, 40, QSizePolicy::Minimum, QSizePolicy::Expanding));
-
-    setup = true;
+  if (not query.exec("SELECT t.razaoSocial, tv.modelo FROM transportadora t LEFT JOIN transportadora_has_veiculo tv ON t.idTransportadora = tv.idTransportadora ORDER BY razaoSocial, modelo")) {
+    return qApp->enqueueError("Erro buscando veiculos: " + query.lastError().text(), this);
   }
 
-  const QDate date = ui->calendarWidget->selectedDate();
-  return updateCalendar(date.addDays(date.dayOfWeek() * -1));
+  while (query.next()) {
+    auto *checkbox = new QCheckBox(this);
+    checkbox->setText(query.value("razaoSocial").toString() + " / " + query.value("modelo").toString());
+    checkbox->setChecked(true);
+    connect(checkbox, &QAbstractButton::toggled, this, &WidgetLogisticaCalendario::updateFilter);
+    ui->groupBoxVeiculos->layout()->addWidget(checkbox);
+  }
+
+  ui->groupBoxVeiculos->layout()->addItem(new QSpacerItem(20, 40, QSizePolicy::Minimum, QSizePolicy::Expanding));
 }
+
+void WidgetLogisticaCalendario::updateTables() {
+  if (not isSet) {
+    listarVeiculos();
+    setConnections();
+    ui->checkBoxMostrarFiltros->toggle();
+    isSet = true;
+  }
+
+  if (not modelIsSet) { modelIsSet = true; }
+
+  const QDate date = ui->calendarWidget->selectedDate();
+  updateCalendar(date.addDays(date.dayOfWeek() * -1));
+}
+
+void WidgetLogisticaCalendario::resetTables() { modelIsSet = false; }
 
 void WidgetLogisticaCalendario::updateFilter() {
   const QDate date = ui->calendarWidget->selectedDate();
   updateCalendar(date.addDays(date.dayOfWeek() * -1));
 }
 
-bool WidgetLogisticaCalendario::updateCalendar(const QDate &startDate) {
+void WidgetLogisticaCalendario::updateCalendar(const QDate &startDate) {
   ui->tableWidget->clearContents();
+
+  ui->tableWidget->horizontalHeader()->setSectionResizeMode(QHeaderView::Interactive);
+  ui->tableWidget->verticalHeader()->setSectionResizeMode(QHeaderView::Interactive);
 
   int veiculos = 0;
   const int start = startDate.day();
 
   QStringList list;
 
-  Q_FOREACH (const auto &item, ui->groupBoxVeiculos->findChildren<QCheckBox *>()) {
-    if (not item->isChecked()) { continue; }
+  const auto children = ui->groupBoxVeiculos->findChildren<QCheckBox *>();
+
+  for (const auto &child : children) {
+    if (not child->isChecked()) { continue; }
 
     veiculos++;
 
-    QStringList temp = item->text().split(" / ");
+    QStringList temp = child->text().split(" / ");
 
     list << "Manhã\n" + temp.at(0) + "\n" + temp.at(1);
     list << "Tarde\n" + temp.at(0) + "\n" + temp.at(1);
@@ -82,7 +97,7 @@ bool WidgetLogisticaCalendario::updateCalendar(const QDate &startDate) {
     const auto item = ui->tableWidget->horizontalHeaderItem(col);
     item->setText(QString::number(dia) + " " + item->text());
     dia++;
-    if (dia > diasMes) dia = 1;
+    if (dia > diasMes) { dia = 1; }
   }
 
   QSqlQuery query;
@@ -90,10 +105,7 @@ bool WidgetLogisticaCalendario::updateCalendar(const QDate &startDate) {
   query.bindValue(":start", startDate);
   query.bindValue(":end", startDate.addDays(6));
 
-  if (not query.exec()) {
-    emit errorSignal("Erro query: " + query.lastError().text());
-    return false;
-  }
+  if (not query.exec()) { return qApp->enqueueError("Erro query: " + query.lastError().text(), this); }
 
   while (query.next()) {
     const QString transportadora = query.value("razaoSocial").toString() + "\n" + query.value("modelo").toString();
@@ -111,36 +123,54 @@ bool WidgetLogisticaCalendario::updateCalendar(const QDate &startDate) {
 
     const int diaSemana = query.value("data").toDate().dayOfWeek();
 
-    QTableWidgetItem *item = ui->tableWidget->item(row, diaSemana) ? ui->tableWidget->item(row, diaSemana) : new QTableWidgetItem();
+    auto *widget = ui->tableWidget->cellWidget(row, diaSemana) ? static_cast<CollapsibleWidget *>(ui->tableWidget->cellWidget(row, diaSemana)) : new CollapsibleWidget(this);
 
-    const QString oldText = item->text();
+    const QString oldText = widget->getHtml();
 
-    QString text = oldText.isEmpty() ? "" : oldText + "\n\n------------------------------------\n\n";
+    QString text = oldText.isEmpty() ? "" : oldText + R"(<p style="-qt-block-indent: 0; text-indent: 0px; margin: 0px;">&nbsp;</p>
+                                                         <p style="-qt-block-indent: 0; text-indent: 0px; margin: 0px;">-----------------------------------------</p>
+                                                         <p style="-qt-block-indent: 0; text-indent: 0px; margin: 0px;">&nbsp;</p>)";
 
-    text += query.value("data").toTime().toString("hh:mm") + "  Kg: " + query.value("kg").toString() + ", Cx.: " + query.value("caixas").toString();
+    QStringList produtos = query.value("produtos").toString().split("/");
+    QString produtosList;
 
-    if (not query.value("idVenda").toString().isEmpty()) text += "\n           " + query.value("idVenda").toString();
+    for (auto &produto : produtos) { produtosList += QString(R"(<li style="-qt-block-indent: 0; text-indent: 0px; margin: 0px;">%1</li>)").arg(produto); }
 
-    if (not query.value("bairro").toString().isEmpty()) text += " - " + query.value("bairro").toString() + " - " + query.value("cidade").toString();
+    const QString destino = query.value("logradouro").toString().replace(" ", "+") + "," + query.value("numero").toString().replace(" ", "+") + "," +
+                            query.value("cidade").toString().replace(" ", "+") + "," + query.value("uf").toString().replace(" ", "+");
 
-    // TODO: 0dont show this to compact screen? or show this only on doubleclick
-    text += "\n" + query.value("text").toString();
+    // TODO: colocar origem como 'arg'
 
-    text += "\n           Status: " + query.value("status").toString();
+    text += QString(R"(<p style="-qt-block-indent: 0; text-indent: 0px; margin: 0px;">10:00 Kg: %1, Cx.: %2</p>
+           <p style="-qt-block-indent: 0; text-indent: 0px; margin: 0px;">%3</p>
+           <p style="-qt-block-indent: 0; text-indent: 0px; margin: 0px;">%4</p>
+           <ul>
+           %5
+           </ul>
+           <p style="-qt-block-indent: 0; text-indent: 0px; margin: 0px;">Status: %6</p>
+           <p style="-qt-block-indent: 0; text-indent: 0px; margin: 0px;">
+           <a href="https://www.google.com/maps/dir/?api=1&amp;origin=Rua+Sales&oacute;polis,27,Barueri,SP&amp;destination=%7&amp;
+           travelmode=driving" target="_blank" rel="noopener">Google Maps</a></p>)")
+                .arg(query.value("kg").toString())
+                .arg(query.value("caixas").toString())
+                .arg(query.value("idVenda").toString())
+                .arg(query.value("bairro").toString() + " - " + query.value("cidade").toString())
+                .arg(produtosList)
+                .arg(query.value("status").toString())
+                .arg(destino);
 
-    item->setText(text);
-
-    if (not ui->tableWidget->item(row, diaSemana)) ui->tableWidget->setItem(row, diaSemana, item);
+    widget->setHtml(text);
+    ui->tableWidget->setCellWidget(row, diaSemana, widget);
+    connect(widget, &CollapsibleWidget::toggled, ui->tableWidget, &QTableWidget::resizeColumnsToContents);
+    connect(widget, &CollapsibleWidget::toggled, ui->tableWidget, &QTableWidget::resizeRowsToContents);
   }
 
-  ui->tableWidget->resizeColumnsToContents();
-  ui->tableWidget->resizeRowsToContents();
+  ui->tableWidget->horizontalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents);
+  ui->tableWidget->verticalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents);
 
   const QString range = startDate.toString("dd-MM-yyyy") + " - " + startDate.addDays(6).toString("dd-MM-yyyy");
 
   ui->lineEditRange->setText(range);
-
-  return true;
 }
 
 void WidgetLogisticaCalendario::on_checkBoxMostrarFiltros_toggled(bool checked) {
@@ -153,3 +183,5 @@ void WidgetLogisticaCalendario::on_pushButtonProximo_clicked() { ui->calendarWid
 void WidgetLogisticaCalendario::on_pushButtonAnterior_clicked() { ui->calendarWidget->setSelectedDate(ui->calendarWidget->selectedDate().addDays(-7)); }
 
 void WidgetLogisticaCalendario::on_calendarWidget_selectionChanged() { updateFilter(); }
+
+// TODO: esconder veiculos que não possuem agendamento na semana

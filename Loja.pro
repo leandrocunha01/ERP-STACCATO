@@ -4,75 +4,102 @@
 #
 #-------------------------------------------------
 
-QT       += core gui sql network xml charts
-
-greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
-
 TARGET = Loja
 TEMPLATE = app
-
-DEFINES += QT_DEPRECATED_WARNINGS
-
-VERSION = 0.6
-QMAKE_TARGET_COMPANY = Staccato Revestimentos
-QMAKE_TARGET_PRODUCT = ERP
-QMAKE_TARGET_DESCRIPTION = ERP da Staccato Revestimentos
-QMAKE_TARGET_COPYRIGHT = Rodrigo Torres
-
-CONFIG += c++1z
-
-win32-g++{
-QMAKE_CXXFLAGS += -Wall -Wextra -Wpedantic -Wfloat-equal -Wnarrowing
-QMAKE_CXXFLAGS += -Wnull-dereference -Wold-style-cast -Wdouble-promotion -Wformat=2 -Wduplicated-cond -Wduplicated-branches -Wlogical-op -Wrestrict -Wshadow=local
-
-QMAKE_CXXFLAGS_DEBUG += -O0
-QMAKE_CXXFLAGS_RELEASE  = -O0
-QMAKE_LFLAGS_DEBUG += -O0
-QMAKE_LFLAGS_RELEASE += -O0
-
-#QMAKE_CXXFLAGS_RELEASE  = -Ofast
-#QMAKE_LFLAGS_RELEASE += -O3
-}
-
-message($$QMAKESPEC)
-
-linux-g++{
-    QMAKE_CC = ccache gcc
-    QMAKE_CXX = ccache g++
-
-    QMAKE_LFLAGS += -fuse-ld=gold
-
-    #QMAKE_CXXFLAGS += -flto
-    #QMAKE_LFLAGS += -flto -fuse-linker-plugin
-}
-
-linux-clang{
-    QMAKE_CC = ccache clang-7
-    QMAKE_CXX = ccache clang++-7
-
-    QMAKE_LFLAGS += -fuse-ld=lld-7
-
-    QMAKE_CXXFLAGS += -Weverything -Wno-reserved-id-macro -Wno-c++98-compat-pedantic -Wno-c++98-compat -Wno-undef -Wno-padded -Wno-sign-conversion -Wno-deprecated -Wno-covered-switch-default
-    QMAKE_CXXFLAGS += -Wno-undefined-reinterpret-cast -Wno-weak-vtables -Wno-exit-time-destructors -Wno-used-but-marked-unused -Wno-inconsistent-missing-destructor-override -Wno-redundant-parens
-    QMAKE_CXXFLAGS += -Wno-shift-sign-overflow -Wno-non-virtual-dtor -Wno-conversion -Wno-global-constructors -Wno-switch-enum -Wno-missing-prototypes -Wno-shadow-field-in-constructor
-    QMAKE_CXXFLAGS += -Wno-shadow -Wno-shadow-field
-
-    #QMAKE_CXXFLAGS += -flto=thin
-    #QMAKE_LFLAGS += -flto=thin
-}
-
-
-RESOURCES += \
-    qrs/resources.qrc
-
-RC_ICONS = Staccato.ico
-
-CONFIG -= console
+VERSION = 0.6.78
 
 include(QtXlsxWriter/src/xlsx/qtxlsx.pri)
 include(QSimpleUpdater/qsimpleupdater.pri)
 include(LimeReport-1.4.51/limereport/limereport.pri)
 include(QDecimal/qdecimal.pri)
+
+QT *= core gui sql network xml charts
+
+greaterThan(QT_MAJOR_VERSION, 4): QT *= widgets
+
+DEFINES *= QT_DEPRECATED_WARNINGS
+DEFINES += APP_VERSION=\"\\\"$${VERSION}\\\"\"
+
+versionAtLeast(QT_VERSION, 5.12){
+    CONFIG *= c++17
+    } else {
+    CONFIG *= c++1z
+    }
+
+message($$QMAKESPEC)
+
+win32{
+    QMAKE_TARGET_COMPANY = Staccato Revestimentos
+    QMAKE_TARGET_PRODUCT = ERP
+    QMAKE_TARGET_DESCRIPTION = ERP da Staccato Revestimentos
+    QMAKE_TARGET_COPYRIGHT = Rodrigo Torres
+
+    RC_ICONS = Staccato.ico
+}
+
+contains(CONFIG, deploy){
+    message(deploy)
+    QMAKE_CXXFLAGS_RELEASE *= -Ofast -flto
+    QMAKE_LFLAGS_RELEASE *= -O3 -fuse-linker-plugin
+} else{
+    QMAKE_CXXFLAGS_DEBUG *= -O0
+    QMAKE_CXXFLAGS_RELEASE *= -O0
+    QMAKE_LFLAGS_DEBUG *= -O0
+    QMAKE_LFLAGS_RELEASE *= -O0
+}
+
+win32-g++{
+    PRECOMPILED_HEADER = pch.h
+    CONFIG *= precompile_header
+}
+
+*-g++{
+    QMAKE_CXXFLAGS *= -Wall -Wextra -Wpedantic -Wfloat-equal -Wnarrowing
+    QMAKE_CXXFLAGS *= -Wnull-dereference -Wold-style-cast -Wdouble-promotion -Wformat=2 -Wduplicated-cond -Wduplicated-branches -Wlogical-op -Wrestrict -Wshadow=local
+    QMAKE_CXXFLAGS *= -Wno-deprecated-copy
+}
+
+*-clang{
+#    QMAKE_CXXFLAGS *= -Weverything -Wno-reserved-id-macro -Wno-c++98-compat-pedantic -Wno-c++98-compat -Wno-undef -Wno-padded -Wno-sign-conversion -Wno-deprecated -Wno-covered-switch-default
+#    QMAKE_CXXFLAGS *= -Wno-undefined-reinterpret-cast -Wno-weak-vtables -Wno-exit-time-destructors -Wno-used-but-marked-unused -Wno-inconsistent-missing-destructor-override -Wno-redundant-parens
+#    QMAKE_CXXFLAGS *= -Wno-shift-sign-overflow -Wno-non-virtual-dtor -Wno-conversion -Wno-global-constructors -Wno-switch-enum -Wno-missing-prototypes -Wno-shadow-field-in-constructor
+#    QMAKE_CXXFLAGS *= -Wno-shadow -Wno-shadow-field
+}
+
+linux-g++{
+    QMAKE_CC = gcc-9
+    QMAKE_CXX = g++-9
+
+    QMAKE_LFLAGS *= -fuse-ld=gold
+
+    #QMAKE_CXXFLAGS *= -flto
+    #QMAKE_LFLAGS *= -flto -fuse-linker-plugin
+}
+
+linux-clang{
+    QMAKE_CC = clang-8
+    QMAKE_CXX = clang++-8
+
+    QMAKE_LFLAGS *= -fuse-ld=lld-8
+
+    #QMAKE_CXXFLAGS *= -flto=thin
+    #QMAKE_LFLAGS *= -flto=thin
+}
+
+linux{
+    CCACHE_BIN = $$system(which ccache)
+
+    !isEmpty(CCACHE_BIN){
+        message("using ccache")
+        QMAKE_CC = ccache $$QMAKE_CC
+        QMAKE_CXX = ccache $$QMAKE_CXX
+        message($$QMAKE_CC)
+        message($$QMAKE_CXX)
+    }
+}
+
+RESOURCES += \
+    qrs/resources.qrc
 
 SOURCES += \
     src/acbr.cpp \
@@ -88,15 +115,19 @@ SOURCES += \
     src/cadastrotransportadora.cpp \
     src/cadastrousuario.cpp \
     src/calculofrete.cpp \
+    src/cancelaproduto.cpp \
     src/cepcompleter.cpp \
+    src/charttooltip.cpp \
+    src/chartview.cpp \
     src/checkboxdelegate.cpp \
+    src/collapsiblewidget.cpp \
     src/combobox.cpp \
     src/comboboxdelegate.cpp \
     src/contas.cpp \
     src/dateformatdelegate.cpp \
     src/devolucao.cpp \
-    src/dialog.cpp \
     src/doubledelegate.cpp \
+    src/editdelegate.cpp \
     src/estoque.cpp \
     src/estoqueprazoproxymodel.cpp \
     src/estoqueproxymodel.cpp \
@@ -138,8 +169,8 @@ SOURCES += \
     src/searchdialog.cpp \
     src/searchdialogproxymodel.cpp \
     src/sendmail.cpp \
-    src/singleeditdelegate.cpp \
     src/smtp.cpp \
+    src/sortfilterproxymodel.cpp \
     src/sql.cpp \
     src/sqlquerymodel.cpp \
     src/sqlrelationaltablemodel.cpp \
@@ -149,7 +180,6 @@ SOURCES += \
     src/validadedialog.cpp \
     src/venda.cpp \
     src/vendaproxymodel.cpp \
-    src/widget.cpp \
     src/widgetcompra.cpp \
     src/widgetcompraconfirmar.cpp \
     src/widgetcompradevolucao.cpp \
@@ -163,6 +193,7 @@ SOURCES += \
     src/widgetfinanceirocompra.cpp \
     src/widgetfinanceirocontas.cpp \
     src/widgetfinanceirofluxocaixa.cpp \
+    src/widgetgraficos.cpp \
     src/widgetlogistica.cpp \
     src/widgetlogisticaagendarcoleta.cpp \
     src/widgetlogisticaagendarentrega.cpp \
@@ -197,15 +228,19 @@ HEADERS  += \
     src/cadastrotransportadora.h \
     src/cadastrousuario.h \
     src/calculofrete.h \
+    src/cancelaproduto.h \
     src/cepcompleter.h \
+    src/charttooltip.h \
+    src/chartview.h \
     src/checkboxdelegate.h \
+    src/collapsiblewidget.h \
     src/combobox.h \
     src/comboboxdelegate.h \
     src/contas.h \
     src/dateformatdelegate.h \
     src/devolucao.h \
-    src/dialog.h \
     src/doubledelegate.h \
+    src/editdelegate.h \
     src/estoque.h \
     src/estoqueprazoproxymodel.h \
     src/estoqueproxymodel.h \
@@ -246,8 +281,8 @@ HEADERS  += \
     src/searchdialog.h \
     src/searchdialogproxymodel.h \
     src/sendmail.h \
-    src/singleeditdelegate.h \
     src/smtp.h \
+    src/sortfilterproxymodel.h \
     src/sql.h \
     src/sqlquerymodel.h \
     src/sqlrelationaltablemodel.h \
@@ -257,7 +292,6 @@ HEADERS  += \
     src/validadedialog.h \
     src/venda.h \
     src/vendaproxymodel.h \
-    src/widget.h \
     src/widgetcompra.h \
     src/widgetcompraconfirmar.h \
     src/widgetcompradevolucao.h \
@@ -271,6 +305,7 @@ HEADERS  += \
     src/widgetfinanceirocompra.h\
     src/widgetfinanceirocontas.h \
     src/widgetfinanceirofluxocaixa.h \
+    src/widgetgraficos.h \
     src/widgetlogistica.h \
     src/widgetlogisticaagendarcoleta.h \
     src/widgetlogisticaagendarentrega.h \
@@ -303,6 +338,8 @@ FORMS += \
     ui/cadastrotransportadora.ui \
     ui/cadastrousuario.ui \
     ui/calculofrete.ui \
+    ui/cancelaproduto.ui \
+    ui/collapsiblewidget.ui \
     ui/contas.ui \
     ui/devolucao.ui \
     ui/estoque.ui \
@@ -339,6 +376,7 @@ FORMS += \
     ui/widgetfinanceirocompra.ui \
     ui/widgetfinanceirocontas.ui \
     ui/widgetfinanceirofluxocaixa.ui \
+    ui/widgetgraficos.ui \
     ui/widgetlogistica.ui \
     ui/widgetlogisticaagendarcoleta.ui \
     ui/widgetlogisticaagendarentrega.ui \

@@ -1,34 +1,36 @@
-#ifndef WIDGETLOGISTICAAGENDARENTREGA_H
-#define WIDGETLOGISTICAAGENDARENTREGA_H
+#pragma once
 
+#include <QWidget>
+
+#include "QDecDouble.hh"
 #include "sqlquerymodel.h"
 #include "sqlrelationaltablemodel.h"
-#include "widget.h"
 
 namespace Ui {
 class WidgetLogisticaAgendarEntrega;
 }
 
-class WidgetLogisticaAgendarEntrega final : public Widget {
+class WidgetLogisticaAgendarEntrega final : public QWidget {
   Q_OBJECT
 
 public:
   explicit WidgetLogisticaAgendarEntrega(QWidget *parent = nullptr);
   ~WidgetLogisticaAgendarEntrega();
-  auto updateTables() -> bool;
+  auto resetTables() -> void;
+  auto updateTables() -> void;
 
 private:
   // attributes
-  //  SqlTableModel modelConsumo;
-  SqlRelationalTableModel modelProdutos;
-  SqlRelationalTableModel modelTransp;
-  SqlRelationalTableModel modelTransp2;
+  bool isSet = false;
+  bool modelIsSet = false;
+  SqlRelationalTableModel modelTranspAtual;
+  SqlRelationalTableModel modelTranspAgend;
   SqlRelationalTableModel modelVendas;
-  SqlQueryModel modelViewProdutos;
+  SqlRelationalTableModel modelProdutos;
   Ui::WidgetLogisticaAgendarEntrega *ui;
   // methods
   auto adicionarProduto(const QModelIndexList &list) -> bool;
-  auto adicionarProdutoParcial(const int row, const int quantAgendar, const int quantTotal) -> bool;
+  auto adicionarProdutoParcial(const int row, const int caixasAgendar, const int caixasTotal) -> bool;
   auto calcularDisponivel() -> void;
   auto calcularPeso() -> void;
   auto montaFiltro() -> void;
@@ -37,17 +39,15 @@ private:
   auto on_pushButtonAdicionarParcial_clicked() -> void;
   auto on_pushButtonAdicionarProduto_clicked() -> void;
   auto on_pushButtonAgendarCarga_clicked() -> void;
+  auto on_pushButtonGerarNFeFutura_clicked() -> void;
   auto on_pushButtonReagendarPedido_clicked() -> void;
   auto on_pushButtonRemoverProduto_clicked() -> void;
-  auto on_tableProdutos_entered(const QModelIndex &) -> void;
-  auto on_tableTransp2_entered(const QModelIndex &) -> void;
   auto on_tableVendas_clicked(const QModelIndex &index) -> void;
   auto on_tableVendas_doubleClicked(const QModelIndex &index) -> void;
-  auto on_tableVendas_entered(const QModelIndex &) -> void;
   auto processRows() -> bool;
-  auto quebrarProduto(const int row, const int quantAgendar, const int quantTotal) -> bool;
+  auto dividirConsumo(const int row, const QDecDouble proporcao, const QDecDouble proporcaoNovo, const int idVendaProduto) -> bool;
+  auto dividirProduto(const int row, const int caixasAgendar, const int caixasTotal) -> bool;
   auto reagendar(const QModelIndexList &list, const QDate &dataPrev, const QString &observacao) -> bool;
   auto setupTables() -> void;
+  auto setConnections() -> void;
 };
-
-#endif // WIDGETLOGISTICAAGENDARENTREGA_H

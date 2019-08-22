@@ -4,6 +4,7 @@
 #include <QSqlError>
 #include <QSqlQuery>
 
+#include "application.h"
 #include "estoqueprazoproxymodel.h"
 #include "inputdialog.h"
 #include "sql.h"
@@ -11,53 +12,48 @@
 #include "venda.h"
 #include "widgetlogisticacoleta.h"
 
-WidgetLogisticaColeta::WidgetLogisticaColeta(QWidget *parent) : Widget(parent), ui(new Ui::WidgetLogisticaColeta) {
-  ui->setupUi(this);
+WidgetLogisticaColeta::WidgetLogisticaColeta(QWidget *parent) : QWidget(parent), ui(new Ui::WidgetLogisticaColeta) { ui->setupUi(this); }
 
+WidgetLogisticaColeta::~WidgetLogisticaColeta() { delete ui; }
+
+void WidgetLogisticaColeta::setConnections() {
   connect(ui->checkBoxMarcarTodos, &QCheckBox::clicked, this, &WidgetLogisticaColeta::on_checkBoxMarcarTodos_clicked);
   connect(ui->lineEditBusca, &QLineEdit::textChanged, this, &WidgetLogisticaColeta::on_lineEditBusca_textChanged);
   connect(ui->pushButtonCancelar, &QPushButton::clicked, this, &WidgetLogisticaColeta::on_pushButtonCancelar_clicked);
   connect(ui->pushButtonMarcarColetado, &QPushButton::clicked, this, &WidgetLogisticaColeta::on_pushButtonMarcarColetado_clicked);
   connect(ui->pushButtonReagendar, &QPushButton::clicked, this, &WidgetLogisticaColeta::on_pushButtonReagendar_clicked);
   connect(ui->pushButtonVenda, &QPushButton::clicked, this, &WidgetLogisticaColeta::on_pushButtonVenda_clicked);
-  connect(ui->table, &TableView::entered, this, &WidgetLogisticaColeta::on_table_entered);
 }
 
-WidgetLogisticaColeta::~WidgetLogisticaColeta() { delete ui; }
-
-bool WidgetLogisticaColeta::updateTables() {
-  if (modelViewColeta.tableName().isEmpty()) setupTables();
-
-  if (not modelViewColeta.select()) {
-    emit errorSignal("Erro lendo tabela pedido_fornecedor_has_produto: " + modelViewColeta.lastError().text());
-    return false;
+void WidgetLogisticaColeta::updateTables() {
+  if (not isSet) {
+    setConnections();
+    isSet = true;
   }
 
-  ui->table->resizeColumnsToContents();
+  if (not modelIsSet) {
+    setupTables();
+    montaFiltro();
+    modelIsSet = true;
+  }
 
-  return true;
+  if (not modelViewColeta.select()) { return; }
 }
 
-void WidgetLogisticaColeta::tableFornLogistica_activated(const QString &fornecedor) {
-  this->fornecedor = fornecedor;
-
+void WidgetLogisticaColeta::tableFornLogistica_clicked(const QString &fornecedor) {
   ui->lineEditBusca->clear();
 
-  modelViewColeta.setFilter("fornecedor = '" + fornecedor + "'");
+  const QString filtro = fornecedor.isEmpty() ? "" : "fornecedor = '" + fornecedor + "'";
 
-  if (not modelViewColeta.select()) {
-    emit errorSignal("Erro lendo tabela pedido_fornecedor_has_produto: " + modelViewColeta.lastError().text());
-    return;
-  }
+  modelViewColeta.setFilter(filtro);
 
   ui->checkBoxMarcarTodos->setChecked(false);
-
-  ui->table->resizeColumnsToContents();
 }
+
+void WidgetLogisticaColeta::resetTables() { modelIsSet = false; }
 
 void WidgetLogisticaColeta::setupTables() {
   modelViewColeta.setTable("view_coleta");
-  modelViewColeta.setEditStrategy(QSqlTableModel::OnManualSubmit);
 
   modelViewColeta.setHeaderData("idEstoque", "Estoque");
   modelViewColeta.setHeaderData("lote", "Lote");
@@ -76,161 +72,123 @@ void WidgetLogisticaColeta::setupTables() {
   modelViewColeta.setHeaderData("dataPrevColeta", "Data Prev. Col.");
   modelViewColeta.setHeaderData("prazoEntrega", "Prazo Limite");
 
-  modelViewColeta.setFilter("0");
+  modelViewColeta.proxyModel = new EstoquePrazoProxyModel(&modelViewColeta, this);
 
-  ui->table->setModel(new EstoquePrazoProxyModel(&modelViewColeta, this));
+  ui->table->setModel(&modelViewColeta);
+
   ui->table->hideColumn("fornecedor");
-  ui->table->hideColumn("prazoEntrega");
   ui->table->hideColumn("ordemCompra");
 }
 
 void WidgetLogisticaColeta::on_pushButtonMarcarColetado_clicked() {
   const auto list = ui->table->selectionModel()->selectedRows();
 
-  if (list.isEmpty()) {
-    emit errorSignal("Nenhum item selecionado!");
-    return;
-  }
+  if (list.isEmpty()) { return qApp->enqueueError("Nenhum item selecionado!", this); }
 
   QStringList idVendas;
 
-  for (const auto &index : list) idVendas << modelViewColeta.data(index.row(), "idVenda").toString();
+  for (const auto &index : list) { idVendas << modelViewColeta.data(index.row(), "idVenda").toString(); }
 
-  InputDialog input(InputDialog::Tipo::Coleta);
+  InputDialog input(InputDialog::Tipo::Coleta, this);
 
   if (input.exec() != InputDialog::Accepted) { return; }
 
-  emit transactionStarted();
+  if (not qApp->startTransaction()) { return; }
 
-  if (not QSqlQuery("SET SESSION TRANSACTION ISOLATION LEVEL SERIALIZABLE").exec()) { return; }
-  if (not QSqlQuery("START TRANSACTION").exec()) { return; }
+  if (not cadastrar(list, input.getDate(), input.getNextDate())) { return qApp->rollbackTransaction(); }
 
-  if (not cadastrar(list, input.getDate(), input.getNextDate())) {
-    QSqlQuery("ROLLBACK").exec();
-    emit transactionEnded();
-    return;
-  }
+  if (not Sql::updateVendaStatus(idVendas)) { return; }
 
-  if (not Sql::updateVendaStatus(idVendas.join(", "))) { return; }
-
-  if (not QSqlQuery("COMMIT").exec()) { return; }
-
-  emit transactionEnded();
+  if (not qApp->endTransaction()) { return; }
 
   updateTables();
-  emit informationSignal("Confirmado coleta!");
+  qApp->enqueueInformation("Confirmado coleta!", this);
 }
 
 bool WidgetLogisticaColeta::cadastrar(const QModelIndexList &list, const QDate &dataColeta, const QDate &dataPrevReceb) {
   QSqlQuery query1;
-  query1.prepare("UPDATE estoque SET status = 'EM RECEBIMENTO' WHERE idEstoque = :idEstoque");
+  query1.prepare("UPDATE estoque SET status = 'EM RECEBIMENTO' WHERE status = 'EM COLETA' AND idEstoque = :idEstoque");
 
   QSqlQuery query2;
-  query2.prepare("UPDATE pedido_fornecedor_has_produto SET status = 'EM RECEBIMENTO', dataRealColeta = :dataRealColeta, dataPrevReceb = :dataPrevReceb WHERE idCompra IN (SELECT idCompra FROM "
-                 "estoque_has_compra WHERE idEstoque = :idEstoque) AND codComercial = :codComercial");
+  query2.prepare("UPDATE pedido_fornecedor_has_produto SET status = 'EM RECEBIMENTO', dataRealColeta = :dataRealColeta, dataPrevReceb = :dataPrevReceb WHERE status = 'EM COLETA' AND idPedido IN "
+                 "(SELECT idPedido FROM estoque_has_compra WHERE idEstoque = :idEstoque)");
 
   QSqlQuery query3;
   // salvar status na venda
-  query3.prepare("UPDATE venda_has_produto SET status = 'EM RECEBIMENTO', dataRealColeta = :dataRealColeta, dataPrevReceb = :dataPrevReceb WHERE idVendaProduto IN (SELECT idVendaProduto FROM "
-                 "estoque_has_consumo WHERE idEstoque = :idEstoque)");
+  query3.prepare("UPDATE venda_has_produto SET status = 'EM RECEBIMENTO', dataRealColeta = :dataRealColeta, dataPrevReceb = :dataPrevReceb WHERE status = 'EM COLETA' AND idVendaProduto IN (SELECT "
+                 "idVendaProduto FROM estoque_has_consumo WHERE idEstoque = :idEstoque)");
 
   QSqlQuery query4;
-  query4.prepare("UPDATE veiculo_has_produto SET status = 'COLETADO' WHERE idEstoque = :idEstoque AND status = 'EM COLETA'");
+  query4.prepare("UPDATE veiculo_has_produto SET status = 'COLETADO' WHERE status = 'EM COLETA' AND idEstoque = :idEstoque");
 
   for (const auto &item : list) {
     query1.bindValue(":idEstoque", modelViewColeta.data(item.row(), "idEstoque"));
 
-    if (not query1.exec()) {
-      emit errorSignal("Erro salvando status do estoque: " + query1.lastError().text());
-      return false;
-    }
+    if (not query1.exec()) { return qApp->enqueueError(false, "Erro salvando status do estoque: " + query1.lastError().text(), this); }
 
     query2.bindValue(":dataRealColeta", dataColeta);
     query2.bindValue(":dataPrevReceb", dataPrevReceb);
     query2.bindValue(":idEstoque", modelViewColeta.data(item.row(), "idEstoque"));
     query2.bindValue(":codComercial", modelViewColeta.data(item.row(), "codComercial"));
 
-    if (not query2.exec()) {
-      emit errorSignal("Erro salvando status no pedido_fornecedor: " + query2.lastError().text());
-      return false;
-    }
+    if (not query2.exec()) { return qApp->enqueueError(false, "Erro salvando status no pedido_fornecedor: " + query2.lastError().text(), this); }
 
     query3.bindValue(":dataRealColeta", dataColeta);
     query3.bindValue(":dataPrevReceb", dataPrevReceb);
     query3.bindValue(":idEstoque", modelViewColeta.data(item.row(), "idEstoque"));
 
-    if (not query3.exec()) {
-      emit errorSignal("Erro atualizando status da compra: " + query3.lastError().text());
-      return false;
-    }
+    if (not query3.exec()) { return qApp->enqueueError(false, "Erro atualizando status da compra: " + query3.lastError().text(), this); }
 
-    //
+    // -------------------------------------------------------------------------
 
     query4.bindValue(":idEstoque", modelViewColeta.data(item.row(), "idEstoque"));
 
-    if (not query4.exec()) {
-      emit errorSignal("Erro atualizando veiculo_has_produto: " + query4.lastError().text());
-      return false;
-    }
+    if (not query4.exec()) { return qApp->enqueueError(false, "Erro atualizando veiculo_has_produto: " + query4.lastError().text(), this); }
   }
 
   return true;
 }
 
-void WidgetLogisticaColeta::on_checkBoxMarcarTodos_clicked(const bool) { ui->table->selectAll(); }
+void WidgetLogisticaColeta::on_checkBoxMarcarTodos_clicked(const bool checked) { checked ? ui->table->selectAll() : ui->table->clearSelection(); }
 
-void WidgetLogisticaColeta::on_table_entered(const QModelIndex &) { ui->table->resizeColumnsToContents(); }
+void WidgetLogisticaColeta::on_lineEditBusca_textChanged(const QString &) { montaFiltro(); }
 
-void WidgetLogisticaColeta::on_lineEditBusca_textChanged(const QString &) {
+void WidgetLogisticaColeta::montaFiltro() {
   const QString textoBusca = ui->lineEditBusca->text();
 
   modelViewColeta.setFilter("(numeroNFe LIKE '%" + textoBusca + "%' OR produto LIKE '%" + textoBusca + "%' OR idVenda LIKE '%" + textoBusca + "%' OR ordemCompra LIKE '%" + textoBusca + "%')");
-
-  if (not modelViewColeta.select()) emit errorSignal("Erro lendo tabela: " + modelViewColeta.lastError().text());
 }
 
 void WidgetLogisticaColeta::on_pushButtonReagendar_clicked() {
   const auto list = ui->table->selectionModel()->selectedRows();
 
-  if (list.isEmpty()) {
-    emit errorSignal("Nenhum item selecionado!");
-    return;
-  }
+  if (list.isEmpty()) { return qApp->enqueueError("Nenhum item selecionado!", this); }
 
-  InputDialog input(InputDialog::Tipo::AgendarColeta);
+  InputDialog input(InputDialog::Tipo::AgendarColeta, this);
 
   if (input.exec() != InputDialog::Accepted) { return; }
 
-  emit transactionStarted();
+  if (not qApp->startTransaction()) { return; }
 
-  if (not QSqlQuery("SET SESSION TRANSACTION ISOLATION LEVEL SERIALIZABLE").exec()) { return; }
-  if (not QSqlQuery("START TRANSACTION").exec()) { return; }
+  if (not reagendar(list, input.getNextDate())) { return qApp->rollbackTransaction(); }
 
-  if (not reagendar(list, input.getNextDate())) {
-    QSqlQuery("ROLLBACK").exec();
-    emit transactionEnded();
-    return;
-  }
-
-  if (not QSqlQuery("COMMIT").exec()) { return; }
-
-  emit transactionEnded();
+  if (not qApp->endTransaction()) { return; }
 
   updateTables();
-  emit informationSignal("Reagendado com sucesso!");
+  qApp->enqueueInformation("Reagendado com sucesso!", this);
 }
 
 bool WidgetLogisticaColeta::reagendar(const QModelIndexList &list, const QDate &dataPrevColeta) {
   QSqlQuery query1;
-  query1.prepare("UPDATE pedido_fornecedor_has_produto SET dataPrevColeta = :dataPrevColeta WHERE idCompra IN (SELECT idCompra FROM estoque_has_compra WHERE idEstoque = :idEstoque)"
-                 " AND codComercial = :codComercial");
+  query1.prepare("UPDATE pedido_fornecedor_has_produto SET dataPrevColeta = :dataPrevColeta WHERE idPedido IN (SELECT idPedido FROM estoque_has_compra WHERE idEstoque = :idEstoque) "
+                 "AND status NOT IN ('CANCELADO', 'DEVOLVIDO')");
 
   QSqlQuery query2;
-  query2.prepare(
-      "UPDATE venda_has_produto SET dataPrevColeta = :dataPrevColeta WHERE idCompra IN (SELECT idCompra FROM estoque_has_compra WHERE idEstoque = :idEstoque) AND codComercial = :codComercial");
+  query2.prepare("UPDATE venda_has_produto SET dataPrevColeta = :dataPrevColeta WHERE idVendaProduto IN (SELECT idVendaProduto FROM estoque_has_consumo WHERE idEstoque = :idEstoque) "
+                 "AND status NOT IN ('CANCELADO', 'DEVOLVIDO')");
 
   QSqlQuery query3;
-  query3.prepare("UPDATE veiculo_has_produto SET data = :data WHERE idEstoque = :idEstoque AND status = 'EM COLETA'");
+  query3.prepare("UPDATE veiculo_has_produto SET data = :data WHERE status = 'EM COLETA' AND idEstoque = :idEstoque");
 
   for (const auto &item : list) {
     const int idEstoque = modelViewColeta.data(item.row(), "idEstoque").toInt();
@@ -240,27 +198,18 @@ bool WidgetLogisticaColeta::reagendar(const QModelIndexList &list, const QDate &
     query1.bindValue(":idEstoque", idEstoque);
     query1.bindValue(":codComercial", codComercial);
 
-    if (not query1.exec()) {
-      emit errorSignal("Erro salvando status no pedido_fornecedor: " + query1.lastError().text());
-      return false;
-    }
+    if (not query1.exec()) { return qApp->enqueueError(false, "Erro salvando status no pedido_fornecedor: " + query1.lastError().text(), this); }
 
     query2.bindValue(":dataPrevColeta", dataPrevColeta);
     query2.bindValue(":idEstoque", idEstoque);
     query2.bindValue(":codComercial", codComercial);
 
-    if (not query2.exec()) {
-      emit errorSignal("Erro salvando status na venda_produto: " + query2.lastError().text());
-      return false;
-    }
+    if (not query2.exec()) { return qApp->enqueueError(false, "Erro salvando status na venda_produto: " + query2.lastError().text(), this); }
 
     query3.bindValue(":data", dataPrevColeta);
     query3.bindValue(":idEstoque", modelViewColeta.data(item.row(), "idEstoque"));
 
-    if (not query3.exec()) {
-      emit errorSignal("Erro atualizando data no veiculo: " + query3.lastError().text());
-      return false;
-    }
+    if (not query3.exec()) { return qApp->enqueueError(false, "Erro atualizando data no veiculo: " + query3.lastError().text(), this); }
   }
 
   return true;
@@ -269,10 +218,7 @@ bool WidgetLogisticaColeta::reagendar(const QModelIndexList &list, const QDate &
 void WidgetLogisticaColeta::on_pushButtonVenda_clicked() {
   const auto list = ui->table->selectionModel()->selectedRows();
 
-  if (list.isEmpty()) {
-    emit errorSignal("Nenhum item selecionado!");
-    return;
-  }
+  if (list.isEmpty()) { return qApp->enqueueError("Nenhum item selecionado!", this); }
 
   for (const auto &item : list) {
     const QString idVenda = modelViewColeta.data(item.row(), "idVenda").toString();
@@ -290,14 +236,15 @@ void WidgetLogisticaColeta::on_pushButtonVenda_clicked() {
 
 bool WidgetLogisticaColeta::cancelar(const QModelIndexList &list) {
   QSqlQuery query1;
-  query1.prepare(
-      "UPDATE pedido_fornecedor_has_produto SET dataPrevColeta = NULL WHERE idCompra IN (SELECT idCompra FROM estoque_has_compra WHERE idEstoque = :idEstoque) AND codComercial = :codComercial");
+  query1.prepare("UPDATE pedido_fornecedor_has_produto SET dataPrevColeta = NULL WHERE idPedido IN (SELECT idPedido FROM estoque_has_compra WHERE idEstoque = :idEstoque) AND status NOT IN "
+                 "('CANCELADO', 'DEVOLVIDO')");
 
   QSqlQuery query2;
-  query2.prepare("UPDATE venda_has_produto SET dataPrevColeta = NULL WHERE idCompra IN (SELECT idCompra FROM estoque_has_compra WHERE idEstoque = :idEstoque) AND codComercial = :codComercial");
+  query2.prepare("UPDATE venda_has_produto SET dataPrevColeta = NULL WHERE idVendaProduto IN (SELECT idVendaProduto FROM estoque_has_consumo WHERE idEstoque = :idEstoque) AND status NOT IN "
+                 "('CANCELADO', 'DEVOLVIDO')");
 
   QSqlQuery query3;
-  query3.prepare("UPDATE veiculo_has_produto SET data = NULL WHERE idEstoque = :idEstoque AND status = 'EM COLETA'");
+  query3.prepare("UPDATE veiculo_has_produto SET data = NULL WHERE status = 'EM COLETA' AND idEstoque = :idEstoque");
 
   for (const auto &item : list) {
     const int idEstoque = modelViewColeta.data(item.row(), "idEstoque").toInt();
@@ -306,25 +253,16 @@ bool WidgetLogisticaColeta::cancelar(const QModelIndexList &list) {
     query1.bindValue(":idEstoque", idEstoque);
     query1.bindValue(":codComercial", codComercial);
 
-    if (not query1.exec()) {
-      emit errorSignal("Erro salvando status no pedido_fornecedor: " + query1.lastError().text());
-      return false;
-    }
+    if (not query1.exec()) { return qApp->enqueueError(false, "Erro salvando status no pedido_fornecedor: " + query1.lastError().text(), this); }
 
     query2.bindValue(":idEstoque", idEstoque);
     query2.bindValue(":codComercial", codComercial);
 
-    if (not query2.exec()) {
-      emit errorSignal("Erro salvando status na venda_produto: " + query2.lastError().text());
-      return false;
-    }
+    if (not query2.exec()) { return qApp->enqueueError(false, "Erro salvando status na venda_produto: " + query2.lastError().text(), this); }
 
     query3.bindValue(":idEstoque", modelViewColeta.data(item.row(), "idEstoque"));
 
-    if (not query3.exec()) {
-      emit errorSignal("Erro atualizando data no veiculo: " + query3.lastError().text());
-      return false;
-    }
+    if (not query3.exec()) { return qApp->enqueueError(false, "Erro atualizando data no veiculo: " + query3.lastError().text(), this); }
   }
 
   return true;
@@ -333,10 +271,7 @@ bool WidgetLogisticaColeta::cancelar(const QModelIndexList &list) {
 void WidgetLogisticaColeta::on_pushButtonCancelar_clicked() {
   const auto list = ui->table->selectionModel()->selectedRows();
 
-  if (list.isEmpty()) {
-    emit errorSignal("Nenhum item selecionado!");
-    return;
-  }
+  if (list.isEmpty()) { return qApp->enqueueError("Nenhum item selecionado!", this); }
 
   QMessageBox msgBox(QMessageBox::Question, "Cancelar?", "Tem certeza que deseja cancelar?", QMessageBox::Yes | QMessageBox::No, this);
   msgBox.setButtonText(QMessageBox::Yes, "Cancelar");
@@ -344,21 +279,12 @@ void WidgetLogisticaColeta::on_pushButtonCancelar_clicked() {
 
   if (msgBox.exec() == QMessageBox::No) { return; }
 
-  emit transactionStarted();
+  if (not qApp->startTransaction()) { return; }
 
-  if (not QSqlQuery("SET SESSION TRANSACTION ISOLATION LEVEL SERIALIZABLE").exec()) { return; }
-  if (not QSqlQuery("START TRANSACTION").exec()) { return; }
+  if (not cancelar(list)) { return qApp->rollbackTransaction(); }
 
-  if (not cancelar(list)) {
-    QSqlQuery("ROLLBACK").exec();
-    emit transactionEnded();
-    return;
-  }
-
-  if (not QSqlQuery("COMMIT").exec()) { return; }
-
-  emit transactionEnded();
+  if (not qApp->endTransaction()) { return; }
 
   updateTables();
-  emit informationSignal("Cancelado com sucesso!");
+  qApp->enqueueInformation("Cancelado com sucesso!", this);
 }

@@ -1,28 +1,24 @@
-#ifndef IMPRESSAO_H
-#define IMPRESSAO_H
+#pragma once
 
 #include <QSqlQuery>
 
 #include "lrreportengine.h"
 #include "sqlrelationaltablemodel.h"
 
-class Impressao final : public QObject {
-  Q_OBJECT
+class Impressao final {
 
 public:
-  explicit Impressao(const QString &id);
+  enum class Tipo { Orcamento, Venda };
+  explicit Impressao(const QString &id, const Tipo tipo, QObject *parent);
+  ~Impressao() = default;
   Impressao(const Impressao &) = delete;
   auto print() -> void;
 
-signals:
-  void errorSignal(const QString &error);
-  void warningSignal(const QString &warning);
-  void informationSignal(const QString &information);
-
 private:
   // attributes
-  enum class Tipo { Orcamento, Venda } tipo;
+  const Tipo tipo;
   const QString id;
+  QObject *parent;
   QSqlQuery queryCliente;
   QSqlQuery queryEndEnt;
   QSqlQuery queryEndFat;
@@ -32,10 +28,6 @@ private:
   QSqlQuery queryProfissional;
   QSqlQuery queryVendedor;
   SqlRelationalTableModel modelItem;
-  LimeReport::ReportEngine *report;
   // methods
   auto setQuerys() -> bool;
-  auto verificaTipo() -> void;
 };
-
-#endif // IMPRESSAO_H

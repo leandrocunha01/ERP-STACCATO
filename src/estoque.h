@@ -1,29 +1,28 @@
-#ifndef ESTOQUE_H
-#define ESTOQUE_H
+#pragma once
 
-#include "dialog.h"
+#include <QDialog>
+
 #include "sqlrelationaltablemodel.h"
 
 namespace Ui {
 class Estoque;
 }
 
-class Estoque final : public Dialog {
+class Estoque final : public QDialog {
   Q_OBJECT
 
 public:
   // REFAC: turn showWindow into a enum
-  Estoque(QString idEstoque, const bool showWindow = true, QWidget *parent = nullptr);
+  explicit Estoque(const QString &idEstoque, const bool showWindow = true, QWidget *parent = nullptr);
   ~Estoque();
   auto criarConsumo(const int idVendaProduto, const double quant = 0) -> bool;
 
 private:
   // attributes
-  const QString idEstoque;
+  const QString idEstoque; // TODO: change this to int?
   SqlRelationalTableModel modelEstoque;
   SqlRelationalTableModel modelConsumo;
   SqlRelationalTableModel modelViewConsumo;
-  SqlRelationalTableModel modelCompra;
   Ui::Estoque *ui;
 
   enum class FieldColors {
@@ -36,17 +35,11 @@ private:
   };
 
   // methods
-  auto atualizaQuantEstoque() -> bool;
   auto calcularRestante() -> void;
+  auto desfazerConsumo() -> bool;
+  auto dividirCompra(const int idVendaProduto, const double quant) -> std::optional<int>;
   auto exibirNota() -> void;
   auto on_pushButtonExibirNfe_clicked() -> void;
-  auto on_tableConsumo_entered(const QModelIndex) -> void;
-  auto on_tableEstoque_activated(const QModelIndex &) -> void;
-  auto on_tableEstoque_entered(const QModelIndex) -> void;
-  auto quebrarCompra(const int idVendaProduto, const double quant) -> bool;
   auto setupTables() -> void;
   auto viewRegisterById(const bool showWindow) -> bool;
-  bool desfazerConsumo();
 };
-
-#endif // ESTOQUE_H

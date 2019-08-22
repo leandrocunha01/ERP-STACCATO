@@ -1,22 +1,18 @@
-#ifndef SEARCHDIALOGPROXY_H
-#define SEARCHDIALOGPROXY_H
+#pragma once
 
-#include <QIdentityProxyModel>
-
+#include "sortfilterproxymodel.h"
 #include "sqlrelationaltablemodel.h"
 
-class SearchDialogProxyModel final : public QIdentityProxyModel {
+class SearchDialogProxyModel final : public SortFilterProxyModel {
 
 public:
-  SearchDialogProxyModel(SqlRelationalTableModel *model, QObject *parent = nullptr);
+  explicit SearchDialogProxyModel(SqlRelationalTableModel *model, QObject *parent = nullptr);
   ~SearchDialogProxyModel() final = default;
   auto data(const QModelIndex &proxyIndex, int role) const -> QVariant final;
 
 private:
-  const int estoque;
-  const int promocao;
-  const int descontinuado;
-  const int validade;
+  const int estoqueColumn;
+  const int promocaoColumn;
+  const int descontinuadoColumn;
+  const int validadeColumn;
 };
-
-#endif // SEARCHDIALOGPROXY_H

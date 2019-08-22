@@ -1,59 +1,51 @@
 #include <QDate>
 #include <QDebug>
-#include <QMessageBox>
 #include <QSqlError>
 #include <QSqlQuery>
 
+#include "application.h"
 #include "estoqueprazoproxymodel.h"
 #include "inputdialogconfirmacao.h"
 #include "ui_widgetlogisticarepresentacao.h"
 #include "widgetlogisticarepresentacao.h"
 
-WidgetLogisticaRepresentacao::WidgetLogisticaRepresentacao(QWidget *parent) : Widget(parent), ui(new Ui::WidgetLogisticaRepresentacao) {
-  ui->setupUi(this);
-
-  connect(ui->lineEditBusca, &QLineEdit::textChanged, this, &WidgetLogisticaRepresentacao::on_lineEditBusca_textChanged);
-  connect(ui->pushButtonMarcarEntregue, &QPushButton::clicked, this, &WidgetLogisticaRepresentacao::on_pushButtonMarcarEntregue_clicked);
-  connect(ui->table, &TableView::entered, this, &WidgetLogisticaRepresentacao::on_table_entered);
-}
+WidgetLogisticaRepresentacao::WidgetLogisticaRepresentacao(QWidget *parent) : QWidget(parent), ui(new Ui::WidgetLogisticaRepresentacao) { ui->setupUi(this); }
 
 WidgetLogisticaRepresentacao::~WidgetLogisticaRepresentacao() { delete ui; }
 
-bool WidgetLogisticaRepresentacao::updateTables() {
-  if (modelViewLogisticaRepresentacao.tableName().isEmpty()) setupTables();
-
-  if (not modelViewLogisticaRepresentacao.select()) {
-    emit errorSignal("Erro lendo tabela pedido_fornecedor_has_produto: " + modelViewLogisticaRepresentacao.lastError().text());
-    return false;
-  }
-
-  ui->table->resizeColumnsToContents();
-
-  return true;
+void WidgetLogisticaRepresentacao::setConnections() {
+  connect(ui->lineEditBusca, &QLineEdit::textChanged, this, &WidgetLogisticaRepresentacao::on_lineEditBusca_textChanged);
+  connect(ui->pushButtonMarcarEntregue, &QPushButton::clicked, this, &WidgetLogisticaRepresentacao::on_pushButtonMarcarEntregue_clicked);
 }
 
-void WidgetLogisticaRepresentacao::tableFornLogistica_activated(const QString &fornecedor) {
-  this->fornecedor = fornecedor;
+void WidgetLogisticaRepresentacao::updateTables() {
+  if (not isSet) {
+    setConnections();
+    isSet = true;
+  }
 
+  if (not modelIsSet) {
+    setupTables();
+    modelIsSet = true;
+  }
+
+  if (not modelViewLogisticaRepresentacao.select()) { return; }
+}
+
+void WidgetLogisticaRepresentacao::tableFornLogistica_clicked(const QString &fornecedor) {
   ui->lineEditBusca->clear();
 
-  modelViewLogisticaRepresentacao.setFilter("fornecedor = '" + fornecedor + "'");
+  const QString filtro = fornecedor.isEmpty() ? "" : "fornecedor = '" + fornecedor + "'";
 
-  if (not modelViewLogisticaRepresentacao.select()) {
-    emit errorSignal("Erro lendo tabela pedido_fornecedor_has_produto: " + modelViewLogisticaRepresentacao.lastError().text());
-    return;
-  }
-
-  ui->table->sortByColumn("prazoEntrega", Qt::AscendingOrder);
-
-  ui->table->resizeColumnsToContents();
+  modelViewLogisticaRepresentacao.setFilter(filtro);
 }
 
-void WidgetLogisticaRepresentacao::setupTables() {
-  // REFAC: refactor this to not select in here
+void WidgetLogisticaRepresentacao::resetTables() { modelIsSet = false; }
 
+void WidgetLogisticaRepresentacao::setupTables() {
   modelViewLogisticaRepresentacao.setTable("view_logistica_representacao");
-  modelViewLogisticaRepresentacao.setEditStrategy(QSqlTableModel::OnManualSubmit);
+
+  modelViewLogisticaRepresentacao.setFilter("");
 
   modelViewLogisticaRepresentacao.setHeaderData("idVenda", "Venda");
   modelViewLogisticaRepresentacao.setHeaderData("cliente", "Cliente");
@@ -66,83 +58,59 @@ void WidgetLogisticaRepresentacao::setupTables() {
   modelViewLogisticaRepresentacao.setHeaderData("ordemCompra", "OC");
   modelViewLogisticaRepresentacao.setHeaderData("prazoEntrega", "Prazo Limite");
 
-  modelViewLogisticaRepresentacao.setFilter("0");
+  modelViewLogisticaRepresentacao.setSort("prazoEntrega", Qt::AscendingOrder);
 
-  if (not modelViewLogisticaRepresentacao.select()) emit errorSignal("Erro lendo tabela: " + modelViewLogisticaRepresentacao.lastError().text());
+  modelViewLogisticaRepresentacao.proxyModel = new EstoquePrazoProxyModel(&modelViewLogisticaRepresentacao, this);
 
-  ui->table->setModel(new EstoquePrazoProxyModel(&modelViewLogisticaRepresentacao, this));
+  ui->table->setModel(&modelViewLogisticaRepresentacao);
+
   ui->table->hideColumn("idPedido");
   ui->table->hideColumn("fornecedor");
-  ui->table->hideColumn("status");
   ui->table->hideColumn("idVendaProduto");
 }
 
 void WidgetLogisticaRepresentacao::on_pushButtonMarcarEntregue_clicked() {
   const auto list = ui->table->selectionModel()->selectedRows();
 
-  if (list.isEmpty()) {
-    emit errorSignal("Nenhum item selecionado!");
-    return;
-  }
+  if (list.isEmpty()) { return qApp->enqueueError("Nenhum item selecionado!", this); }
 
-  InputDialogConfirmacao input(InputDialogConfirmacao::Tipo::Representacao);
+  InputDialogConfirmacao input(InputDialogConfirmacao::Tipo::Representacao, this);
 
   if (input.exec() != InputDialogConfirmacao::Accepted) { return; }
 
-  emit transactionStarted();
+  if (not qApp->startTransaction()) { return; }
 
-  if (not QSqlQuery("SET SESSION TRANSACTION ISOLATION LEVEL SERIALIZABLE").exec()) { return; }
-  if (not QSqlQuery("START TRANSACTION").exec()) { return; }
+  if (not processRows(list, input.getDateTime(), input.getRecebeu())) { return qApp->rollbackTransaction(); }
 
-  if (not processRows(list, input.getDateTime(), input.getRecebeu())) {
-    QSqlQuery("ROLLBACK").exec();
-    emit transactionEnded();
-    return;
-  }
-
-  if (not QSqlQuery("COMMIT").exec()) { return; }
-
-  emit transactionEnded();
+  if (not qApp->endTransaction()) { return; }
 
   updateTables();
-  emit informationSignal("Atualizado!");
+  qApp->enqueueInformation("Atualizado!", this);
 }
 
 bool WidgetLogisticaRepresentacao::processRows(const QModelIndexList &list, const QDateTime &dataEntrega, const QString &recebeu) {
   QSqlQuery query1;
-  query1.prepare("UPDATE pedido_fornecedor_has_produto SET status = 'ENTREGUE', dataRealEnt = :dataRealEnt WHERE idVendaProduto = :idVendaProduto");
+  query1.prepare("UPDATE pedido_fornecedor_has_produto SET status = 'ENTREGUE', dataRealEnt = :dataRealEnt WHERE status = 'EM ENTREGA' AND idVendaProduto = :idVendaProduto");
 
   QSqlQuery query2;
-  query2.prepare("UPDATE venda_has_produto SET status = 'ENTREGUE', dataRealEnt = :dataRealEnt, recebeu = :recebeu WHERE idVendaProduto = :idVendaProduto");
+  query2.prepare("UPDATE venda_has_produto SET status = 'ENTREGUE', dataRealEnt = :dataRealEnt, recebeu = :recebeu WHERE status = 'EM ENTREGA' AND idVendaProduto = :idVendaProduto");
 
   for (const auto &item : list) {
     query1.bindValue(":dataRealEnt", dataEntrega);
     query1.bindValue(":idVendaProduto", modelViewLogisticaRepresentacao.data(item.row(), "idVendaProduto"));
 
-    if (not query1.exec()) {
-      emit errorSignal("Erro salvando status no pedido_fornecedor: " + query1.lastError().text());
-      return false;
-    }
+    if (not query1.exec()) { return qApp->enqueueError(false, "Erro salvando status no pedido_fornecedor: " + query1.lastError().text(), this); }
 
     query2.bindValue(":dataRealEnt", dataEntrega);
     query2.bindValue(":idVendaProduto", modelViewLogisticaRepresentacao.data(item.row(), "idVendaProduto"));
     query2.bindValue(":recebeu", recebeu);
 
-    if (not query2.exec()) {
-      emit errorSignal("Erro salvando status na venda_produto: " + query2.lastError().text());
-      return false;
-    }
+    if (not query2.exec()) { return qApp->enqueueError(false, "Erro salvando status na venda_produto: " + query2.lastError().text(), this); }
   }
 
   return true;
 }
 
-void WidgetLogisticaRepresentacao::on_table_entered(const QModelIndex &) { ui->table->resizeColumnsToContents(); }
-
-void WidgetLogisticaRepresentacao::on_lineEditBusca_textChanged(const QString &text) {
-  modelViewLogisticaRepresentacao.setFilter("(idVenda LIKE '%" + text + "%' OR cliente LIKE '%" + text + "%')");
-
-  if (not modelViewLogisticaRepresentacao.select()) emit errorSignal("Erro lendo tabela: " + modelViewLogisticaRepresentacao.lastError().text());
-}
+void WidgetLogisticaRepresentacao::on_lineEditBusca_textChanged(const QString &text) { modelViewLogisticaRepresentacao.setFilter("(idVenda LIKE '%" + text + "%' OR cliente LIKE '%" + text + "%')"); }
 
 // TODO: 2palimanan precisa de coleta/recebimento (colocar flag no cadastro dizendo que entra no fluxo de logistica)

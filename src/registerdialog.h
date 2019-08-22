@@ -1,32 +1,28 @@
-#ifndef REGISTERDIALOG_H
-#define REGISTERDIALOG_H
+#pragma once
 
 #include <QDataWidgetMapper>
+#include <QDialog>
 #include <QLineEdit>
 
-#include "dialog.h"
 #include "sqlrelationaltablemodel.h"
 
-class RegisterDialog : public Dialog {
+class RegisterDialog : public QDialog {
   Q_OBJECT
 
 public:
-  explicit RegisterDialog(const QString &table, const QString &primaryKey, QWidget *parent);
-  ~RegisterDialog() = default;
+  explicit RegisterDialog(const QString &table, const QString &primaryKey, QWidget *parent = nullptr);
+  ~RegisterDialog() override = default;
 
   auto marcarDirty() -> void;
-  auto saveSlot() -> void;
   auto show() -> void;
-  static auto getLastInsertId() -> QVariant;
-  virtual auto viewRegister() -> bool;
   virtual auto viewRegisterById(const QVariant &id) -> bool;
 
 signals:
-  void registerUpdated(const QVariant &idCliente, const QString &text);
+  void registerUpdated(const QVariant &idCliente);
 
 protected:
   // attributes
-  bool isDirty = false; // TODO: o LimeReport tem isso, olhar lá como fizeram
+  bool isDirty = false;
   enum class Tipo { Cadastrar, Atualizar } tipo = Tipo::Cadastrar;
   int currentRow = -1;
   QDataWidgetMapper mapper;
@@ -36,15 +32,17 @@ protected:
   SqlRelationalTableModel model;
   // methods
   auto addMapping(QWidget *widget, const QString &key, const QByteArray &propertyName = QByteArray()) -> void;
-  auto closeEvent(QCloseEvent *event) -> void override;
+  auto closeEvent(QCloseEvent *event) -> void final;
+  auto columnsToUpper(SqlRelationalTableModel &someModel, const int row) -> bool;
   auto confirmationMessage() -> bool;
   auto data(const QString &key) -> QVariant;
   auto data(const int row, const QString &key) -> QVariant;
   auto getTextKeys() const -> QStringList;
-  auto keyPressEvent(QKeyEvent *event) -> void override;
+  auto keyPressEvent(QKeyEvent *event) -> void final;
   auto remove() -> void;
   auto requiredStyle() -> QString;
   auto setData(const QString &key, const QVariant &value) -> bool;
+  auto setForeignKey(SqlRelationalTableModel &secondaryModel) -> bool;
   auto setTextKeys(const QStringList &value) -> void;
   auto validaCNPJ(const QString &text) -> bool;
   auto validaCPF(const QString &text) -> bool;
@@ -60,6 +58,5 @@ protected:
   virtual auto updateMode() -> void = 0;
   virtual auto verifyFields() -> bool = 0;
   virtual auto verifyRequiredField(QLineEdit *line, const bool silent = false) -> bool;
+  virtual auto viewRegister() -> bool;
 };
-
-#endif // REGISTERDIALOG_H

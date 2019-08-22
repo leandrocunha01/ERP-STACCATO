@@ -1,20 +1,21 @@
-#ifndef WIDGETLOGISTICA_H
-#define WIDGETLOGISTICA_H
+#pragma once
+
+#include <QWidget>
 
 #include "sqlrelationaltablemodel.h"
-#include "widget.h"
 
 namespace Ui {
 class WidgetLogistica;
 }
 
-class WidgetLogistica final : public Widget {
+class WidgetLogistica final : public QWidget {
   Q_OBJECT
 
 public:
   explicit WidgetLogistica(QWidget *parent = nullptr);
   ~WidgetLogistica();
-  auto updateTables() -> bool;
+  auto resetTables() -> void;
+  auto updateTables() -> void;
 
 private:
   // attributes
@@ -22,8 +23,6 @@ private:
   Ui::WidgetLogistica *ui;
   // methods
   auto setConnections() -> void;
-  auto on_tableForn_activated(const QModelIndex &index) -> void;
+  auto on_tableForn_clicked(const QModelIndex &index) -> void;
   auto on_tabWidgetLogistica_currentChanged(const int) -> void;
 };
-
-#endif // WIDGETLOGISTICA_H

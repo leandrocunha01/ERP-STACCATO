@@ -1,28 +1,31 @@
-#ifndef WIDGETCOMPRAPENDENTES_H
-#define WIDGETCOMPRAPENDENTES_H
+#pragma once
+
+#include <QWidget>
 
 #include "sqlrelationaltablemodel.h"
-#include "widget.h"
 
 namespace Ui {
 class WidgetCompraPendentes;
 }
 
-class WidgetCompraPendentes final : public Widget {
+class WidgetCompraPendentes final : public QWidget {
   Q_OBJECT
 
 public:
   explicit WidgetCompraPendentes(QWidget *parent = nullptr);
   ~WidgetCompraPendentes();
-  auto updateTables() -> bool;
+  auto resetTables() -> void;
+  auto updateTables() -> void;
 
 private:
   // attributes
+  bool isSet = false;
+  bool modelIsSet = false;
   SqlRelationalTableModel modelViewVendaProduto;
   Ui::WidgetCompraPendentes *ui;
   // methods
   auto insere(const QDate &dataPrevista) -> bool;
-  auto makeConnections() -> void;
+  auto setConnections() -> void;
   auto montaFiltro() -> void;
   auto on_doubleSpinBoxQuantAvulsoCaixas_valueChanged(const double value) -> void;
   auto on_doubleSpinBoxQuantAvulso_valueChanged(const double value) -> void;
@@ -31,9 +34,6 @@ private:
   auto on_pushButtonExcel_clicked() -> void;
   auto on_pushButtonPDF_clicked() -> void;
   auto on_table_activated(const QModelIndex &index) -> void;
-  auto on_table_entered(const QModelIndex &) -> void;
   auto setarDadosAvulso() -> void;
   auto setupTables() -> void;
 };
-
-#endif // WIDGETCOMPRAPENDENTES_H

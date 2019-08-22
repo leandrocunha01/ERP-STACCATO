@@ -1,11 +1,14 @@
+#include <QDebug>
 #include <QMessageBox>
+#include <QSqlError>
+#include <QVersionNumber>
 
 #include "application.h"
 #include "logindialog.h"
 #include "ui_logindialog.h"
 #include "usersession.h"
 
-LoginDialog::LoginDialog(const Tipo tipo, QWidget *parent) : Dialog(parent), tipo(tipo), ui(new Ui::LoginDialog) {
+LoginDialog::LoginDialog(const Tipo tipo, QWidget *parent) : QDialog(parent), tipo(tipo), ui(new Ui::LoginDialog) {
   ui->setupUi(this);
 
   connect(ui->comboBoxLoja, &QComboBox::currentTextChanged, this, &LoginDialog::on_comboBoxLoja_currentTextChanged);
@@ -25,7 +28,9 @@ LoginDialog::LoginDialog(const Tipo tipo, QWidget *parent) : Dialog(parent), tip
     ui->lineEditPass->setFocus();
   }
 
-  if (const auto key = UserSession::getSetting("Login/hostname"); key) ui->lineEditHostname->setText(key.value().toString());
+  if (const auto key = UserSession::getSetting("Login/hostname"); key) { ui->lineEditHostname->setText(key.value().toString()); }
+
+  if (const auto key = UserSession::getSetting("Login/loja"); key) { ui->comboBoxLoja->setCurrentText(key.value().toString()); }
 
   ui->labelHostname->hide();
   ui->lineEditHostname->hide();
@@ -43,7 +48,9 @@ LoginDialog::LoginDialog(const Tipo tipo, QWidget *parent) : Dialog(parent), tip
 }
 
 void LoginDialog::setComboBox() {
-  Q_FOREACH (const auto &loja, qApp->getMapLojas().keys()) { ui->comboBoxLoja->addItem(loja); }
+  const auto keys = qApp->getMapLojas().keys();
+
+  for (const auto &loja : keys) { ui->comboBoxLoja->addItem(loja); }
 }
 
 LoginDialog::~LoginDialog() { delete ui; }
@@ -61,20 +68,40 @@ void LoginDialog::on_pushButtonLogin_clicked() {
 
   if (not qApp->dbConnect()) { return; }
 
+  if (not verificaVersao()) { return; }
+
   if (not UserSession::login(ui->lineEditUser->text(), ui->lineEditPass->text(), tipo == Tipo::Autorizacao ? UserSession::Tipo::Autorizacao : UserSession::Tipo::Padrao)) {
-    emit errorSignal("Login inválido!");
+    qApp->enqueueError("Login inválido!", this);
     ui->lineEditPass->setFocus();
     return;
   }
 
   accept();
 
-  if (tipo == Tipo::Login) UserSession::setSetting("User/lastuser", ui->lineEditUser->text());
+  if (tipo == Tipo::Login) { UserSession::setSetting("User/lastuser", ui->lineEditUser->text()); }
 }
 
-void LoginDialog::on_comboBoxLoja_currentTextChanged(const QString &loja) { ui->lineEditHostname->setText(qApp->getMapLojas().value(loja)); }
+bool LoginDialog::verificaVersao() {
+  QSqlQuery query;
 
-void LoginDialog::on_lineEditHostname_textChanged(const QString &) {
-  UserSession::setSetting("Login/hostname", ui->lineEditHostname->text());
+  if (not query.exec("SELECT versaoAtual FROM versao_erp") or not query.first()) { return qApp->enqueueError(false, "Erro verificando versão atual: " + query.lastError().text()); }
+
+  QVersionNumber currentVersion = QVersionNumber::fromString(qApp->applicationVersion());
+  QVersionNumber serverVersion = QVersionNumber::fromString(query.value("versaoAtual").toString());
+
+  if (currentVersion < serverVersion) {
+    return qApp->enqueueError(false, "Versão do ERP não é a mais recente!\nSua versão: " + qApp->applicationVersion() + "\nVersão atual: " + query.value("versaoAtual").toString());
+  }
+
+  return true;
+}
+
+void LoginDialog::on_comboBoxLoja_currentTextChanged(const QString &loja) {
+  UserSession::setSetting("Login/loja", loja);
+  ui->lineEditHostname->setText(qApp->getMapLojas().value(loja));
+}
+
+void LoginDialog::on_lineEditHostname_textChanged(const QString &hostname) {
+  UserSession::setSetting("Login/hostname", hostname);
   qApp->updater();
 }

@@ -67,12 +67,6 @@
          <property name="sortingEnabled">
           <bool>true</bool>
          </property>
-         <attribute name="horizontalHeaderCascadingSectionResizes">
-          <bool>true</bool>
-         </attribute>
-         <attribute name="horizontalHeaderStretchLastSection">
-          <bool>false</bool>
-         </attribute>
         </widget>
        </item>
       </layout>
@@ -87,13 +81,6 @@
       <layout class="QGridLayout" name="gridLayout_2">
        <item row="0" column="0" colspan="2">
         <layout class="QVBoxLayout" name="verticalLayout">
-         <item>
-          <widget class="QCheckBox" name="checkBoxMostrarSul">
-           <property name="text">
-            <string>SUL</string>
-           </property>
-          </widget>
-         </item>
          <item>
           <widget class="QCheckBox" name="checkBoxMarcarTodos">
            <property name="text">
@@ -123,12 +110,6 @@
          <property name="sortingEnabled">
           <bool>true</bool>
          </property>
-         <attribute name="horizontalHeaderCascadingSectionResizes">
-          <bool>true</bool>
-         </attribute>
-         <attribute name="horizontalHeaderStretchLastSection">
-          <bool>false</bool>
-         </attribute>
         </widget>
        </item>
        <item row="3" column="0">

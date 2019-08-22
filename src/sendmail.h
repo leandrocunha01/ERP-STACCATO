@@ -1,7 +1,4 @@
-#ifndef SENDMAIL_H
-#define SENDMAIL_H
-
-#include "dialog.h"
+#pragma once
 
 #include <QProgressDialog>
 
@@ -9,7 +6,7 @@ namespace Ui {
 class SendMail;
 }
 
-class SendMail final : public Dialog {
+class SendMail final : public QDialog {
   Q_OBJECT
 
 public:
@@ -31,5 +28,3 @@ private:
   auto on_pushButtonEnviar_clicked() -> void;
   auto successStatus() -> void;
 };
-
-#endif // SENDMAIL_H

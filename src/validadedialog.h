@@ -1,13 +1,12 @@
-#ifndef VALIDADEDIALOG_H
-#define VALIDADEDIALOG_H
+#pragma once
 
-#include "dialog.h"
+#include <QDialog>
 
 namespace Ui {
 class ValidadeDialog;
 }
 
-class ValidadeDialog final : public Dialog {
+class ValidadeDialog final : public QDialog {
   Q_OBJECT
 
 public:
@@ -23,5 +22,3 @@ private:
   auto on_pushButtonSalvar_clicked() -> void;
   auto on_spinBox_valueChanged(const int dias) -> void;
 };
-
-#endif // VALIDADEDIALOG_H

@@ -52,12 +52,6 @@
      <property name="sortingEnabled">
       <bool>true</bool>
      </property>
-     <attribute name="horizontalHeaderCascadingSectionResizes">
-      <bool>true</bool>
-     </attribute>
-     <attribute name="horizontalHeaderStretchLastSection">
-      <bool>false</bool>
-     </attribute>
     </widget>
    </item>
    <item row="2" column="0">
@@ -79,6 +73,9 @@
       <widget class="QLineEdit" name="lineEditBusca">
        <property name="enabled">
         <bool>true</bool>
+       </property>
+       <property name="placeholderText">
+        <string>NFe/Produto/Venda/OC</string>
        </property>
       </widget>
      </item>
