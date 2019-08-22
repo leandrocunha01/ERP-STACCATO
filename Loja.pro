@@ -86,18 +86,6 @@ linux-clang{
     #QMAKE_LFLAGS *= -flto=thin
 }
 
-linux{
-    CCACHE_BIN = $$system(which ccache)
-
-    !isEmpty(CCACHE_BIN){
-        message("using ccache")
-        QMAKE_CC = ccache $$QMAKE_CC
-        QMAKE_CXX = ccache $$QMAKE_CXX
-        message($$QMAKE_CC)
-        message($$QMAKE_CXX)
-    }
-}
-
 RESOURCES += \
     qrs/resources.qrc
 
